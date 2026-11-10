@@ -41,6 +41,11 @@ sealed class AppDestination(val route: String) {
     object Profile : AppDestination("profile")
     object TaskList : AppDestination("tasks")
     object AddTask : AppDestination("add-task")
+    object TaskDetail : AppDestination("task-detail/{taskId}") {
+        const val TASK_ID = "taskId"
+
+        fun createRoute(id: Int) = "task-detail/$id"
+    }
 }
 
 @Composable
@@ -559,12 +564,46 @@ fun TodoNavHost(repository: TodoRepository) {
                     },
                     onRetry = {
                         apiReload++
+                    },
+                    onOpenTask = { id ->
+                        val taskId = id.toIntOrNull()
+
+                        if (taskId != null) {
+                            navController.navigate(
+                                AppDestination.TaskDetail.createRoute(taskId)
+                            )
+                        }
                     }
                 )
 
             }
         }
 
+        composable(
+            route = AppDestination.TaskDetail.route,
+            arguments = listOf(
+                navArgument(AppDestination.TaskDetail.TASK_ID) {
+                    type = NavType.IntType
+                }
+            )
+        ) { entry ->
+            val taskId = entry.arguments?.getInt(
+                AppDestination.TaskDetail.TASK_ID
+            ) ?: -1
+
+            if (currentUser == null && !isGuest) {
+                LaunchedEffect(Unit) {
+                    replaceWithLogin()
+                }
+            } else {
+                TaskDetailScreen(
+                    taskId = taskId,
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
         composable(AppDestination.AddTask.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {

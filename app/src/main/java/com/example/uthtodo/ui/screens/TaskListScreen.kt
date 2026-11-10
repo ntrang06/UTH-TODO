@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.components.*
+import androidx.compose.foundation.clickable
 
 @Composable
 fun TaskListScreen(
@@ -32,7 +33,8 @@ fun TaskListScreen(
     onHome: () -> Unit,
     onAdd: () -> Unit,
     onToggle: (String) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onOpenTask: (String) -> Unit = {}
 ) {
     var query by rememberSaveable {
         mutableStateOf("")
@@ -166,7 +168,10 @@ fun TaskListScreen(
                                 task = task,
                                 content = dashboard,
                                 onToggle = onToggle,
-                                showDate = true
+                                showDate = true,
+                                onOpen = {
+                                    onOpenTask(task.id)
+                                }
                             )
                         }
                     }
@@ -180,7 +185,8 @@ fun TaskListScreen(
 fun TaskSyncBanner(
     feed: TaskFeed,
     content: TaskContent,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onOpenTask: (String) -> Unit = {}
 ) {
     val message = when {
         feed.error != null -> feed.error
@@ -231,8 +237,9 @@ fun TaskRow(
     task: TodoTask,
     content: DashboardContent,
     onToggle: (String) -> Unit,
-    showDate: Boolean = false
-) {
+    showDate: Boolean = false,
+    onOpen: (() -> Unit)? = null
+){
     Row(
         Modifier
             .fillMaxWidth()
@@ -297,7 +304,15 @@ fun TaskRow(
             }
         }
 
-        Column(Modifier.weight(1f)) {
+        Column(
+            modifier = if (onOpen != null) {
+                Modifier
+                    .weight(1f)
+                    .clickable(onClick = onOpen)
+            } else {
+                Modifier.weight(1f)
+            }
+        ) {
             Text(
                 task.title,
                 fontSize = 13.sp,
