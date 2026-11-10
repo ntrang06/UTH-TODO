@@ -57,7 +57,11 @@ fun TaskDetailScreen(
         mutableStateOf(false)
     }
 
-    // GET API: Lấy thông tin công việc.
+    var isEditing by remember(taskId) {
+        mutableStateOf(false)
+    }
+
+    // GET API: Lấy chi tiết công việc
     LaunchedEffect(taskId, retry) {
         loading = true
         error = null
@@ -74,17 +78,18 @@ fun TaskDetailScreen(
         }
     }
 
-    // Nhận trạng thái đã cập nhật từ Navigation.
+    // Nhận thay đổi từ Navigation
     LaunchedEffect(cachedTask) {
         if (cachedTask != null && !isUpdating) {
             task = cachedTask
         }
     }
 
-    // Hàm PATCH dùng chung cho công việc và việc nhỏ.
+    // PATCH API dùng chung
     fun updateTask(
-        updatedTask: TeachingTask,
-        successMessage: String
+        updated: TeachingTask,
+        successMessage: String,
+        closeEditor: Boolean = false
     ) {
         if (isUpdating) return
 
@@ -92,14 +97,14 @@ fun TaskDetailScreen(
             isUpdating = true
 
             try {
-                // Gửi dữ liệu mới lên API.
-                patchApi.updateTask(updatedTask)
+                patchApi.updateTask(updated)
 
-                // Chỉ đổi giao diện khi API trả thành công.
-                task = updatedTask
+                task = updated
+                onTaskUpdated(updated)
 
-                // Cập nhật dữ liệu dùng chung trong Navigation.
-                onTaskUpdated(updatedTask)
+                if (closeEditor) {
+                    isEditing = false
+                }
 
                 Toast.makeText(
                     context,
@@ -121,52 +126,38 @@ fun TaskDetailScreen(
         }
     }
 
-    // PATCH: Đánh dấu công việc chính hoàn thành.
     fun markTaskCompleted() {
         val current = task ?: return
 
-        if (current.done || isUpdating) return
-
-        updateTask(
-            updatedTask = current.copy(done = true),
-            successMessage = "Đã hoàn thành công việc!"
-        )
+        if (!current.done && !isUpdating) {
+            updateTask(
+                updated = current.copy(done = true),
+                successMessage = "Đã hoàn thành công việc!"
+            )
+        }
     }
 
-    // PATCH: Thay đổi trạng thái một việc nhỏ.
-    fun toggleSubtask(
-        index: Int,
-        checked: Boolean
-    ) {
+    fun toggleSubtask(index: Int, checked: Boolean) {
         val current = task ?: return
 
-        if (isUpdating) return
-
-        if (index !in current.subtasks.indices) {
+        if (isUpdating || index !in current.subtasks.indices) {
             return
         }
 
         val updatedSubtasks = current.subtasks.mapIndexed {
-                subIndex, subtask ->
-
-            if (subIndex == index) {
-                subtask.copy(done = checked)
+                i, sub ->
+            if (i == index) {
+                sub.copy(done = checked)
             } else {
-                subtask
+                sub
             }
         }
 
-        val updatedTask = current.copy(
-            subtasks = updatedSubtasks
-        )
-
         updateTask(
-            updatedTask = updatedTask,
-            successMessage = if (checked) {
-                "Đã hoàn thành việc nhỏ!"
-            } else {
-                "Đã bỏ đánh dấu việc nhỏ!"
-            }
+            updated = current.copy(
+                subtasks = updatedSubtasks
+            ),
+            successMessage = "Đã cập nhật việc nhỏ!"
         )
     }
 
@@ -197,12 +188,14 @@ fun TaskDetailScreen(
 
                 Spacer(Modifier.weight(1f))
 
-                // Chức năng sửa sẽ làm sau.
-                Text(
-                    text = "Sửa",
-                    color = TodoColors.Gray,
-                    fontSize = 14.sp
-                )
+                TextButton(
+                    onClick = { isEditing = true },
+                    enabled = task != null &&
+                            !loading &&
+                            !isUpdating
+                ) {
+                    Text("Sửa")
+                }
             }
         },
 
@@ -217,9 +210,7 @@ fun TaskDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Button(
-                        onClick = {
-                            markTaskCompleted()
-                        },
+                        onClick = { markTaskCompleted() },
                         enabled = !isUpdating &&
                                 task?.done == false,
                         modifier = Modifier
@@ -233,23 +224,19 @@ fun TaskDetailScreen(
                                 color = Color.White,
                                 strokeWidth = 2.dp
                             )
-
                             Spacer(Modifier.width(10.dp))
                         }
 
                         Text(
-                            text = when {
-                                isUpdating ->
-                                    "Đang cập nhật..."
-                                task?.done == true ->
-                                    "Đã hoàn thành"
-                                else ->
-                                    "Đánh dấu hoàn thành"
+                            when {
+                                isUpdating -> "Đang cập nhật..."
+                                task?.done == true -> "Đã hoàn thành"
+                                else -> "Đánh dấu hoàn thành"
                             }
                         )
                     }
 
-                    // DELETE API sẽ làm ở phần sau.
+                    // DELETE API sẽ làm bước tiếp theo
                     TextButton(
                         onClick = {},
                         enabled = false
@@ -278,19 +265,14 @@ fun TaskDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = error.orEmpty(),
+                        error.orEmpty(),
                         color = MaterialTheme.colorScheme.error
                     )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Button(
-                        onClick = { retry++ }
-                    ) {
+                    Button(onClick = { retry++ }) {
                         Text("Thử lại")
                     }
                 }
@@ -298,11 +280,7 @@ fun TaskDetailScreen(
 
             task != null -> {
                 val detail = task!!
-
-                val completed = detail.subtasks.count {
-                    it.done
-                }
-
+                val completed = detail.subtasks.count { it.done }
                 val total = detail.subtasks.size
 
                 Column(
@@ -312,25 +290,18 @@ fun TaskDetailScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(20.dp)
                 ) {
-                    // Danh mục
                     Text(
-                        text = if (
-                            detail.category.equals(
-                                "study",
-                                ignoreCase = true
-                            )
-                        ) {
+                        text = if (detail.category == "study") {
                             "Học tập"
                         } else {
                             "Cuộc sống"
                         },
-                        fontSize = 12.sp,
-                        color = TodoColors.Blue
+                        color = TodoColors.Blue,
+                        fontSize = 12.sp
                     )
 
                     Spacer(Modifier.height(8.dp))
 
-                    // Tiêu đề công việc
                     Text(
                         text = detail.title,
                         fontSize = 25.sp,
@@ -340,7 +311,6 @@ fun TaskDetailScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Thông tin công việc
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -351,8 +321,8 @@ fun TaskDetailScreen(
                             .padding(16.dp)
                     ) {
                         DetailInfoRow(
-                            label = "Hạn chót",
-                            value = "${detail.date}, ${detail.time}"
+                            "Hạn chót",
+                            "${detail.date}, ${detail.time}"
                         )
 
                         HorizontalDivider(
@@ -362,12 +332,8 @@ fun TaskDetailScreen(
                         )
 
                         DetailInfoRow(
-                            label = "Nhắc nhở",
-                            value = if (detail.remind) {
-                                "Đã bật"
-                            } else {
-                                "Đã tắt"
-                            }
+                            "Nhắc nhở",
+                            if (detail.remind) "Đã bật" else "Đã tắt"
                         )
 
                         HorizontalDivider(
@@ -377,10 +343,8 @@ fun TaskDetailScreen(
                         )
 
                         DetailInfoRow(
-                            label = "Ưu tiên",
-                            value = when (
-                                detail.priority.lowercase()
-                            ) {
+                            "Ưu tiên",
+                            when (detail.priority) {
                                 "high" -> "Cao"
                                 "low" -> "Thấp"
                                 else -> "Vừa"
@@ -390,9 +354,8 @@ fun TaskDetailScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Ghi chú
                     Text(
-                        text = "Ghi chú",
+                        "Ghi chú",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -415,19 +378,18 @@ fun TaskDetailScreen(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Tiến độ việc nhỏ
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Việc nhỏ",
+                            "Việc nhỏ",
                             modifier = Modifier.weight(1f),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
 
                         Text(
-                            text = "$completed/$total",
+                            "$completed/$total",
                             color = TodoColors.Gray
                         )
                     }
@@ -450,7 +412,6 @@ fun TaskDetailScreen(
 
                     Spacer(Modifier.height(14.dp))
 
-                    // Danh sách việc nhỏ
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -463,40 +424,33 @@ fun TaskDetailScreen(
                     ) {
                         if (detail.subtasks.isEmpty()) {
                             Text(
-                                text = "Chưa có việc nhỏ",
+                                "Chưa có việc nhỏ",
                                 color = TodoColors.Gray
                             )
                         }
 
-                        detail.subtasks.forEachIndexed {
-                                index, subtask ->
-
+                        detail.subtasks.forEachIndexed { index, sub ->
                             Row(
                                 verticalAlignment =
                                     Alignment.CenterVertically
                             ) {
                                 Checkbox(
-                                    checked = subtask.done,
+                                    checked = sub.done,
                                     onCheckedChange = { checked ->
-                                        toggleSubtask(
-                                            index = index,
-                                            checked = checked
-                                        )
+                                        toggleSubtask(index, checked)
                                     },
                                     enabled = !isUpdating
                                 )
 
                                 Text(
-                                    text = subtask.title,
+                                    text = sub.title,
                                     fontSize = 13.sp,
-                                    textDecoration = if (
-                                        subtask.done
-                                    ) {
+                                    textDecoration = if (sub.done) {
                                         TextDecoration.LineThrough
                                     } else {
                                         null
                                     },
-                                    color = if (subtask.done) {
+                                    color = if (sub.done) {
                                         TodoColors.Gray
                                     } else {
                                         Color.Black
@@ -510,6 +464,26 @@ fun TaskDetailScreen(
                 }
             }
         }
+    }
+
+    // Mở màn sửa công việc
+    if (isEditing && task != null) {
+        EditTaskScreen(
+            task = task!!,
+            isSaving = isUpdating,
+            onCancel = {
+                if (!isUpdating) {
+                    isEditing = false
+                }
+            },
+            onSave = { updated ->
+                updateTask(
+                    updated = updated,
+                    successMessage = "Đã cập nhật công việc!",
+                    closeEditor = true
+                )
+            }
+        )
     }
 }
 
