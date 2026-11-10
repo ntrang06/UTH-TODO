@@ -534,8 +534,9 @@ fun TodoNavHost(repository: TodoRepository) {
                     replaceWithLogin()
                 }
             } else {
+
                 TaskListScreen(
-                    feed = feed,
+                    feed = apiFeed,
                     content = taskContent,
                     dashboard = dashboardContent,
                     onHome = {
@@ -549,11 +550,18 @@ fun TodoNavHost(repository: TodoRepository) {
                             AppDestination.AddTask.route
                         )
                     },
-                    onToggle = toggleTask,
+                    onToggle = {
+                        Toast.makeText(
+                            context,
+                            "Chức năng cập nhật API sẽ làm ở bước PATCH",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
                     onRetry = {
-                        reload++
+                        apiReload++
                     }
                 )
+
             }
         }
 
