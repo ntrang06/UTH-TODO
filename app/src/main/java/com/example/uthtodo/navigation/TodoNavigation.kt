@@ -23,6 +23,8 @@ import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.screens.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import android.util.Log
+import com.example.uthtodo.data.TeachingTaskApi
 
 sealed class AppDestination(val route: String) {
     object Splash : AppDestination("splash")
@@ -46,6 +48,38 @@ fun TodoNavHost(repository: TodoRepository) {
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+
+    val teachingApi = remember {
+        TeachingTaskApi()
+    }
+
+    LaunchedEffect(teachingApi) {
+        try {
+            val apiTasks = teachingApi.getTasks()
+
+            Log.d(
+                "UTH_API",
+                "Lấy API thành công: ${apiTasks.size} công việc"
+            )
+
+            apiTasks.forEach { task ->
+                Log.d(
+                    "UTH_API",
+                    "ID=${task.id}, " +
+                            "Tên=${task.title}, " +
+                            "Hoàn thành=${task.done}"
+                )
+            }
+
+        } catch (e: Exception) {
+            Log.e(
+                "UTH_API",
+                "Lỗi gọi API: ${e.message}",
+                e
+            )
+        }
+    }
+
 
     val authRepository = remember(appContext) {
         AuthRepository(appContext)
