@@ -57,8 +57,7 @@ fun TaskDetailScreen(
         mutableStateOf(false)
     }
 
-    // GET API: Tải chi tiết công việc.
-    // Ưu tiên dữ liệu đã PATCH trong phiên sử dụng.
+    // GET API: Lấy thông tin công việc.
     LaunchedEffect(taskId, retry) {
         loading = true
         error = null
@@ -75,39 +74,36 @@ fun TaskDetailScreen(
         }
     }
 
-    // Nhận trạng thái cập nhật từ Navigation.
+    // Nhận trạng thái đã cập nhật từ Navigation.
     LaunchedEffect(cachedTask) {
-        if (cachedTask != null) {
+        if (cachedTask != null && !isUpdating) {
             task = cachedTask
         }
     }
 
-    // PATCH API: Đánh dấu công việc hoàn thành.
-    fun markTaskCompleted() {
-        val current = task ?: return
-
-        if (isUpdating || current.done) return
+    // Hàm PATCH dùng chung cho công việc và việc nhỏ.
+    fun updateTask(
+        updatedTask: TeachingTask,
+        successMessage: String
+    ) {
+        if (isUpdating) return
 
         scope.launch {
             isUpdating = true
 
             try {
-                val updatedTask = current.copy(
-                    done = true
-                )
-
-                // Gọi PATCH thật đến API của thầy.
+                // Gửi dữ liệu mới lên API.
                 patchApi.updateTask(updatedTask)
 
-                // Cập nhật màn Chi tiết.
+                // Chỉ đổi giao diện khi API trả thành công.
                 task = updatedTask
 
-                // Đồng bộ về Trang chủ và Danh sách.
+                // Cập nhật dữ liệu dùng chung trong Navigation.
                 onTaskUpdated(updatedTask)
 
                 Toast.makeText(
                     context,
-                    "PATCH thành công! Đã đánh dấu hoàn thành.",
+                    successMessage,
                     Toast.LENGTH_SHORT
                 ).show()
 
@@ -116,13 +112,62 @@ fun TaskDetailScreen(
             } catch (e: Exception) {
                 Toast.makeText(
                     context,
-                    "Lỗi cập nhật: ${e.localizedMessage}",
+                    "PATCH thất bại: ${e.localizedMessage}",
                     Toast.LENGTH_LONG
                 ).show()
             } finally {
                 isUpdating = false
             }
         }
+    }
+
+    // PATCH: Đánh dấu công việc chính hoàn thành.
+    fun markTaskCompleted() {
+        val current = task ?: return
+
+        if (current.done || isUpdating) return
+
+        updateTask(
+            updatedTask = current.copy(done = true),
+            successMessage = "Đã hoàn thành công việc!"
+        )
+    }
+
+    // PATCH: Thay đổi trạng thái một việc nhỏ.
+    fun toggleSubtask(
+        index: Int,
+        checked: Boolean
+    ) {
+        val current = task ?: return
+
+        if (isUpdating) return
+
+        if (index !in current.subtasks.indices) {
+            return
+        }
+
+        val updatedSubtasks = current.subtasks.mapIndexed {
+                subIndex, subtask ->
+
+            if (subIndex == index) {
+                subtask.copy(done = checked)
+            } else {
+                subtask
+            }
+        }
+
+        val updatedTask = current.copy(
+            subtasks = updatedSubtasks
+        )
+
+        updateTask(
+            updatedTask = updatedTask,
+            successMessage = if (checked) {
+                "Đã hoàn thành việc nhỏ!"
+            } else {
+                "Đã bỏ đánh dấu việc nhỏ!"
+            }
+        )
     }
 
     Scaffold(
@@ -152,7 +197,7 @@ fun TaskDetailScreen(
 
                 Spacer(Modifier.weight(1f))
 
-                // Chức năng sửa sẽ tích hợp ở bước tiếp.
+                // Chức năng sửa sẽ làm sau.
                 Text(
                     text = "Sửa",
                     color = TodoColors.Gray,
@@ -204,7 +249,7 @@ fun TaskDetailScreen(
                         )
                     }
 
-                    // DELETE API sẽ tích hợp ở bước sau.
+                    // DELETE API sẽ làm ở phần sau.
                     TextButton(
                         onClick = {},
                         enabled = false
@@ -244,9 +289,7 @@ fun TaskDetailScreen(
                     Spacer(Modifier.height(12.dp))
 
                     Button(
-                        onClick = {
-                            retry++
-                        }
+                        onClick = { retry++ }
                     ) {
                         Text("Thử lại")
                     }
@@ -255,9 +298,11 @@ fun TaskDetailScreen(
 
             task != null -> {
                 val detail = task!!
+
                 val completed = detail.subtasks.count {
                     it.done
                 }
+
                 val total = detail.subtasks.size
 
                 Column(
@@ -285,7 +330,7 @@ fun TaskDetailScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // Tên công việc
+                    // Tiêu đề công việc
                     Text(
                         text = detail.title,
                         fontSize = 25.sp,
@@ -423,27 +468,35 @@ fun TaskDetailScreen(
                             )
                         }
 
-                        detail.subtasks.forEach { sub ->
+                        detail.subtasks.forEachIndexed {
+                                index, subtask ->
+
                             Row(
                                 verticalAlignment =
                                     Alignment.CenterVertically
                             ) {
-                                // Checkbox chỉ hiển thị.
-                                // PATCH việc nhỏ làm ở bước tiếp.
                                 Checkbox(
-                                    checked = sub.done,
-                                    onCheckedChange = null
+                                    checked = subtask.done,
+                                    onCheckedChange = { checked ->
+                                        toggleSubtask(
+                                            index = index,
+                                            checked = checked
+                                        )
+                                    },
+                                    enabled = !isUpdating
                                 )
 
                                 Text(
-                                    text = sub.title,
+                                    text = subtask.title,
                                     fontSize = 13.sp,
-                                    textDecoration = if (sub.done) {
+                                    textDecoration = if (
+                                        subtask.done
+                                    ) {
                                         TextDecoration.LineThrough
                                     } else {
                                         null
                                     },
-                                    color = if (sub.done) {
+                                    color = if (subtask.done) {
                                         TodoColors.Gray
                                     } else {
                                         Color.Black
