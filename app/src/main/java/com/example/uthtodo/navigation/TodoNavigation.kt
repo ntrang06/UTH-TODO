@@ -1,3 +1,4 @@
+
 package com.example.uthtodo.navigation
 
 import android.app.Activity
@@ -19,6 +20,10 @@ import com.example.uthtodo.data.AuthRepository
 import com.example.uthtodo.data.DashboardRepository
 import com.example.uthtodo.data.TaskRepository
 import com.example.uthtodo.data.TodoRepository
+import com.example.uthtodo.data.TeachingTask
+import com.example.uthtodo.data.TeachingTaskApi
+import com.example.uthtodo.data.TeachingTaskPatchApi
+import com.example.uthtodo.data.toTodoTask
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.screens.*
 import kotlinx.coroutines.CancellationException
@@ -29,7 +34,6 @@ sealed class AppDestination(val route: String) {
 
     object Onboarding : AppDestination("onboarding/{pageIndex}") {
         const val PAGE_INDEX = "pageIndex"
-
         fun createRoute(index: Int) = "onboarding/$index"
     }
 
@@ -38,6 +42,11 @@ sealed class AppDestination(val route: String) {
     object Profile : AppDestination("profile")
     object TaskList : AppDestination("tasks")
     object AddTask : AppDestination("add-task")
+
+    object TaskDetail : AppDestination("task-detail/{taskId}") {
+        const val TASK_ID = "taskId"
+        fun createRoute(id: Int) = "task-detail/$id"
+    }
 }
 
 @Composable
@@ -47,6 +56,123 @@ fun TodoNavHost(repository: TodoRepository) {
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
 
+    // API của thầy - Bài tuần 04
+    val teachingApi = remember { TeachingTaskApi() }
+    val teachingPatchApi = remember { TeachingTaskPatchApi() }
+
+    var apiReload by remember {
+        mutableIntStateOf(0)
+    }
+
+    var apiFeed by remember {
+        mutableStateOf(TaskFeed())
+    }
+
+    // Lưu các thay đổi PATCH trong phiên sử dụng
+    val apiOverrides = remember {
+        mutableStateMapOf<Int, TeachingTask>()
+    }
+
+    var isApiUpdating by remember {
+        mutableStateOf(false)
+    }
+
+    // Đồng bộ dữ liệu giữa các màn hình
+    val applyApiTask: (TeachingTask) -> Unit = { updated ->
+        apiOverrides[updated.id] = updated
+
+        apiFeed = apiFeed.copy(
+            tasks = apiFeed.tasks.map { old ->
+                if (old.id == updated.id.toString()) {
+                    updated.toTodoTask()
+                } else {
+                    old
+                }
+            }
+        )
+    }
+
+    // GET API: Lấy danh sách công việc
+    LaunchedEffect(apiReload) {
+        apiFeed = apiFeed.copy(
+            isLoading = true,
+            error = null
+        )
+
+        try {
+            val tasks = teachingApi.getTasks()
+                .map { serverTask ->
+                    val current = apiOverrides[serverTask.id]
+                        ?: serverTask
+
+                    current.toTodoTask()
+                }
+                .sortedBy { it.dueAtMillis }
+
+            apiFeed = TaskFeed(
+                tasks = tasks,
+                isLoading = false
+            )
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            apiFeed = TaskFeed(
+                tasks = apiFeed.tasks,
+                isLoading = false,
+                error = e.localizedMessage
+                    ?: "Không tải được công việc từ API."
+            )
+        }
+    }
+
+    // PATCH API: Đánh dấu hoàn thành / chưa hoàn thành
+    val toggleApiTask: (String) -> Unit = { id ->
+        val taskId = id.toIntOrNull()
+
+        if (taskId != null && !isApiUpdating) {
+            scope.launch {
+                isApiUpdating = true
+
+                try {
+                    val current = apiOverrides[taskId]
+                        ?: teachingApi.getTaskById(taskId)
+
+                    val updated = current.copy(
+                        done = !current.done
+                    )
+
+                    teachingPatchApi.updateTask(updated)
+
+                    // Chỉ cập nhật giao diện sau khi PATCH thành công
+                    applyApiTask(updated)
+
+                    Toast.makeText(
+                        context,
+                        if (updated.done) {
+                            "Đã đánh dấu hoàn thành!"
+                        } else {
+                            "Đã chuyển về chưa hoàn thành!"
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        context,
+                        "Lỗi PATCH: ${e.localizedMessage}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    isApiUpdating = false
+                }
+            }
+        }
+    }
+
+    // Firebase - Giữ nguyên phần BT01 và BT02
     val authRepository = remember(appContext) {
         AuthRepository(appContext)
     }
@@ -153,7 +279,7 @@ fun TodoNavHost(repository: TodoRepository) {
         }
     }
 
-    // Giữ thao tác lỗi để thử lại với cùng ID công việc.
+    // Các thao tác Firestore cũ
     fun submitWrite(action: ((String) -> Unit) -> Unit) {
         val writeOwner = owner
 
@@ -221,7 +347,6 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
-
             launchSingleTop = true
         }
     }
@@ -241,7 +366,6 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
-
             launchSingleTop = true
         }
     }
@@ -250,6 +374,8 @@ fun TodoNavHost(repository: TodoRepository) {
         navController = navController,
         startDestination = AppDestination.Splash.route
     ) {
+
+        // Splash
         composable(AppDestination.Splash.route) {
             SplashScreen(
                 appInfo = appInfo,
@@ -268,13 +394,13 @@ fun TodoNavHost(repository: TodoRepository) {
                         popUpTo(AppDestination.Splash.route) {
                             inclusive = true
                         }
-
                         launchSingleTop = true
                     }
                 }
             )
         }
 
+        // Onboarding
         composable(
             route = AppDestination.Onboarding.route,
             arguments = listOf(
@@ -312,6 +438,7 @@ fun TodoNavHost(repository: TodoRepository) {
             )
         }
 
+        // Login - Firebase Authentication
         composable(AppDestination.Login.route) {
             LoginScreen(
                 appInfo = appInfo,
@@ -329,7 +456,6 @@ fun TodoNavHost(repository: TodoRepository) {
                             popUpTo(AppDestination.Login.route) {
                                 inclusive = true
                             }
-
                             launchSingleTop = true
                         }
                     }
@@ -362,10 +488,9 @@ fun TodoNavHost(repository: TodoRepository) {
                                 try {
                                     when (
                                         val result =
-                                            authRepository
-                                                .signInWithGoogle(
-                                                    activity
-                                                )
+                                            authRepository.signInWithGoogle(
+                                                activity
+                                            )
                                     ) {
                                         is SignInResult.Success -> {
                                             currentUser = result.user
@@ -383,8 +508,7 @@ fun TodoNavHost(repository: TodoRepository) {
 
                                         is SignInResult.Error -> {
                                             loginState = LoginUiState(
-                                                errorMessage =
-                                                    result.message
+                                                errorMessage = result.message
                                             )
                                         }
 
@@ -408,6 +532,7 @@ fun TodoNavHost(repository: TodoRepository) {
             )
         }
 
+        // Trang chủ - GET và PATCH API
         composable(AppDestination.Home.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -416,7 +541,7 @@ fun TodoNavHost(repository: TodoRepository) {
             } else {
                 HomeScreen(
                     user = currentUser,
-                    feed = feed,
+                    feed = apiFeed,
                     content = dashboardContent,
                     taskContent = taskContent,
                     onProfile = {
@@ -439,13 +564,15 @@ fun TodoNavHost(repository: TodoRepository) {
                         )
                     },
                     onRetry = {
-                        reload++
+                        apiReload++
                     },
-                    onToggleTask = toggleTask
+                    onToggleTask = toggleApiTask,
+                    apiMode = true
                 )
             }
         }
 
+        // Danh sách - GET và PATCH API
         composable(AppDestination.TaskList.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -453,7 +580,7 @@ fun TodoNavHost(repository: TodoRepository) {
                 }
             } else {
                 TaskListScreen(
-                    feed = feed,
+                    feed = apiFeed,
                     content = taskContent,
                     dashboard = dashboardContent,
                     onHome = {
@@ -467,14 +594,55 @@ fun TodoNavHost(repository: TodoRepository) {
                             AppDestination.AddTask.route
                         )
                     },
-                    onToggle = toggleTask,
+                    onToggle = toggleApiTask,
                     onRetry = {
-                        reload++
+                        apiReload++
+                    },
+                    onOpenTask = { id ->
+                        val taskId = id.toIntOrNull()
+
+                        if (taskId != null) {
+                            navController.navigate(
+                                AppDestination.TaskDetail.createRoute(
+                                    taskId
+                                )
+                            )
+                        }
                     }
                 )
             }
         }
 
+        // Chi tiết - GET và PATCH API
+        composable(
+            route = AppDestination.TaskDetail.route,
+            arguments = listOf(
+                navArgument(AppDestination.TaskDetail.TASK_ID) {
+                    type = NavType.IntType
+                }
+            )
+        ) { entry ->
+            val taskId = entry.arguments?.getInt(
+                AppDestination.TaskDetail.TASK_ID
+            ) ?: -1
+
+            if (currentUser == null && !isGuest) {
+                LaunchedEffect(Unit) {
+                    replaceWithLogin()
+                }
+            } else {
+                TaskDetailScreen(
+                    taskId = taskId,
+                    cachedTask = apiOverrides[taskId],
+                    onTaskUpdated = applyApiTask,
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
+        // Thêm công việc - Giữ chức năng Firebase cũ
         composable(AppDestination.AddTask.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -504,13 +672,13 @@ fun TodoNavHost(repository: TodoRepository) {
                             }
                         }
 
-                        // Banner ở màn trước thể hiện trạng thái đồng bộ.
                         navController.popBackStack()
                     }
                 )
             }
         }
 
+        // Hồ sơ - Firebase Authentication
         composable(AppDestination.Profile.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -549,8 +717,7 @@ fun TodoNavHost(repository: TodoRepository) {
                                     }
 
                                     if (
-                                        authRepository
-                                            .getCurrentUser() == null
+                                        authRepository.getCurrentUser() == null
                                     ) {
                                         currentUser = null
                                         isGuest = false
