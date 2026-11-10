@@ -23,17 +23,22 @@ import com.example.uthtodo.data.TodoRepository
 import com.example.uthtodo.data.TeachingTask
 import com.example.uthtodo.data.TeachingTaskApi
 import com.example.uthtodo.data.TeachingTaskPatchApi
+import com.example.uthtodo.data.TeachingTaskPostApi
 import com.example.uthtodo.data.toTodoTask
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.screens.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 sealed class AppDestination(val route: String) {
     object Splash : AppDestination("splash")
 
     object Onboarding : AppDestination("onboarding/{pageIndex}") {
         const val PAGE_INDEX = "pageIndex"
+
         fun createRoute(index: Int) = "onboarding/$index"
     }
 
@@ -45,6 +50,7 @@ sealed class AppDestination(val route: String) {
 
     object TaskDetail : AppDestination("task-detail/{taskId}") {
         const val TASK_ID = "taskId"
+
         fun createRoute(id: Int) = "task-detail/$id"
     }
 }
@@ -57,8 +63,17 @@ fun TodoNavHost(repository: TodoRepository) {
     val scope = rememberCoroutineScope()
 
     // API của thầy - Bài tuần 04
-    val teachingApi = remember { TeachingTaskApi() }
-    val teachingPatchApi = remember { TeachingTaskPatchApi() }
+    val teachingApi = remember {
+        TeachingTaskApi()
+    }
+
+    val teachingPatchApi = remember {
+        TeachingTaskPatchApi()
+    }
+
+    val teachingPostApi = remember {
+        TeachingTaskPostApi()
+    }
 
     var apiReload by remember {
         mutableIntStateOf(0)
@@ -68,16 +83,27 @@ fun TodoNavHost(repository: TodoRepository) {
         mutableStateOf(TaskFeed())
     }
 
-    // Lưu các thay đổi PATCH trong phiên sử dụng
+    // Những công việc đã PATCH trong phiên
     val apiOverrides = remember {
         mutableStateMapOf<Int, TeachingTask>()
+    }
+
+    // Những ID đã DELETE trong phiên
+    val deletedApiTaskIds = remember {
+        mutableStateListOf<Int>()
+    }
+
+    // Công việc mới được POST thành công.
+    // Mock API trả dữ liệu mẫu nên lưu bản nhập ở máy.
+    val locallyCreatedTasks = remember {
+        mutableStateMapOf<String, TodoTask>()
     }
 
     var isApiUpdating by remember {
         mutableStateOf(false)
     }
 
-    // Đồng bộ dữ liệu giữa các màn hình
+    // Cập nhật công việc giữa các màn hình
     val applyApiTask: (TeachingTask) -> Unit = { updated ->
         apiOverrides[updated.id] = updated
 
@@ -92,7 +118,8 @@ fun TodoNavHost(repository: TodoRepository) {
         )
     }
 
-    // GET API: Lấy danh sách công việc
+    // GET API: Lấy danh sách từ server và gộp
+    // những công việc thêm mới trong phiên
     LaunchedEffect(apiReload) {
         apiFeed = apiFeed.copy(
             isLoading = true,
@@ -100,23 +127,31 @@ fun TodoNavHost(repository: TodoRepository) {
         )
 
         try {
-            val tasks = teachingApi.getTasks()
+            val serverTasks = teachingApi.getTasks()
+                .filter { serverTask ->
+                    serverTask.id !in deletedApiTaskIds
+                }
                 .map { serverTask ->
                     val current = apiOverrides[serverTask.id]
                         ?: serverTask
 
                     current.toTodoTask()
                 }
+
+            val combinedTasks = (
+                    serverTasks + locallyCreatedTasks.values
+                    ).distinctBy { it.id }
                 .sortedBy { it.dueAtMillis }
 
             apiFeed = TaskFeed(
-                tasks = tasks,
+                tasks = combinedTasks,
                 isLoading = false
             )
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Giữ dữ liệu đang có khi GET thất bại
             apiFeed = TaskFeed(
                 tasks = apiFeed.tasks,
                 isLoading = false,
@@ -126,47 +161,86 @@ fun TodoNavHost(repository: TodoRepository) {
         }
     }
 
-    // PATCH API: Đánh dấu hoàn thành / chưa hoàn thành
+    // Cập nhật nhanh công việc đã POST,
+    // chỉ ở bộ nhớ vì chưa có ID thật của server.
+    val toggleLocalTask: (String) -> Unit = { id ->
+        val current = locallyCreatedTasks[id]
+
+        if (current != null) {
+            val completed = !current.isCompleted
+
+            val updated = current.copy(
+                isCompleted = completed,
+                completedAtMillis = if (completed) {
+                    System.currentTimeMillis()
+                } else {
+                    null
+                }
+            )
+
+            locallyCreatedTasks[id] = updated
+
+            apiFeed = apiFeed.copy(
+                tasks = apiFeed.tasks.map { task ->
+                    if (task.id == id) updated else task
+                }
+            )
+
+            Toast.makeText(
+                context,
+                "Đã cập nhật trạng thái trên thiết bị.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // PATCH API: Hoàn thành / chưa hoàn thành
     val toggleApiTask: (String) -> Unit = { id ->
-        val taskId = id.toIntOrNull()
+        if (locallyCreatedTasks.containsKey(id)) {
+            toggleLocalTask(id)
+        } else {
+            val taskId = id.toIntOrNull()
 
-        if (taskId != null && !isApiUpdating) {
-            scope.launch {
-                isApiUpdating = true
+            if (
+                taskId != null &&
+                taskId !in deletedApiTaskIds &&
+                !isApiUpdating
+            ) {
+                scope.launch {
+                    isApiUpdating = true
 
-                try {
-                    val current = apiOverrides[taskId]
-                        ?: teachingApi.getTaskById(taskId)
+                    try {
+                        val current = apiOverrides[taskId]
+                            ?: teachingApi.getTaskById(taskId)
 
-                    val updated = current.copy(
-                        done = !current.done
-                    )
+                        val updated = current.copy(
+                            done = !current.done
+                        )
 
-                    teachingPatchApi.updateTask(updated)
+                        teachingPatchApi.updateTask(updated)
+                        applyApiTask(updated)
 
-                    // Chỉ cập nhật giao diện sau khi PATCH thành công
-                    applyApiTask(updated)
+                        Toast.makeText(
+                            context,
+                            if (updated.done) {
+                                "Đã đánh dấu hoàn thành!"
+                            } else {
+                                "Đã chuyển về chưa hoàn thành!"
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
 
-                    Toast.makeText(
-                        context,
-                        if (updated.done) {
-                            "Đã đánh dấu hoàn thành!"
-                        } else {
-                            "Đã chuyển về chưa hoàn thành!"
-                        },
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Toast.makeText(
-                        context,
-                        "Lỗi PATCH: ${e.localizedMessage}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } finally {
-                    isApiUpdating = false
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            "Lỗi PATCH: ${e.localizedMessage}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } finally {
+                        isApiUpdating = false
+                    }
                 }
             }
         }
@@ -197,10 +271,21 @@ fun TodoNavHost(repository: TodoRepository) {
         repository.getIllustrationData()
     }
 
-    val taskContent = remember { TaskContent() }
-    val dashboardContent = remember { DashboardContent() }
-    val profileContent = remember { ProfileContent() }
-    val loginContent = remember { LoginContent() }
+    val taskContent = remember {
+        TaskContent()
+    }
+
+    val dashboardContent = remember {
+        DashboardContent()
+    }
+
+    val profileContent = remember {
+        ProfileContent()
+    }
+
+    val loginContent = remember {
+        LoginContent()
+    }
 
     var currentUser by remember {
         mutableStateOf(authRepository.getCurrentUser())
@@ -279,7 +364,7 @@ fun TodoNavHost(repository: TodoRepository) {
         }
     }
 
-    // Các thao tác Firestore cũ
+    // Giữ phần ghi dữ liệu Firestore cũ
     fun submitWrite(action: ((String) -> Unit) -> Unit) {
         val writeOwner = owner
 
@@ -347,6 +432,7 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
+
             launchSingleTop = true
         }
     }
@@ -366,6 +452,7 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
+
             launchSingleTop = true
         }
     }
@@ -394,6 +481,7 @@ fun TodoNavHost(repository: TodoRepository) {
                         popUpTo(AppDestination.Splash.route) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -456,6 +544,7 @@ fun TodoNavHost(repository: TodoRepository) {
                             popUpTo(AppDestination.Login.route) {
                                 inclusive = true
                             }
+
                             launchSingleTop = true
                         }
                     }
@@ -532,7 +621,7 @@ fun TodoNavHost(repository: TodoRepository) {
             )
         }
 
-        // Trang chủ - GET và PATCH API
+        // Trang chủ - GET, PATCH và POST
         composable(AppDestination.Home.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -572,7 +661,7 @@ fun TodoNavHost(repository: TodoRepository) {
             }
         }
 
-        // Danh sách - GET và PATCH API
+        // Danh sách - GET, PATCH và POST
         composable(AppDestination.TaskList.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -599,21 +688,34 @@ fun TodoNavHost(repository: TodoRepository) {
                         apiReload++
                     },
                     onOpenTask = { id ->
-                        val taskId = id.toIntOrNull()
+                        if (locallyCreatedTasks.containsKey(id)) {
+                            Toast.makeText(
+                                context,
+                                "Công việc vừa thêm chỉ có ID tạm. " +
+                                        "Mock API chưa hỗ trợ mở chi tiết " +
+                                        "công việc này.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            val taskId = id.toIntOrNull()
 
-                        if (taskId != null) {
-                            navController.navigate(
-                                AppDestination.TaskDetail.createRoute(
-                                    taskId
+                            if (
+                                taskId != null &&
+                                taskId !in deletedApiTaskIds
+                            ) {
+                                navController.navigate(
+                                    AppDestination.TaskDetail.createRoute(
+                                        taskId
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 )
             }
         }
 
-        // Chi tiết - GET và PATCH API
+        // Chi tiết - GET, PATCH và DELETE
         composable(
             route = AppDestination.TaskDetail.route,
             arguments = listOf(
@@ -635,6 +737,20 @@ fun TodoNavHost(repository: TodoRepository) {
                     taskId = taskId,
                     cachedTask = apiOverrides[taskId],
                     onTaskUpdated = applyApiTask,
+                    onTaskDeleted = { deletedId ->
+
+                        if (deletedId !in deletedApiTaskIds) {
+                            deletedApiTaskIds.add(deletedId)
+                        }
+
+                        apiOverrides.remove(deletedId)
+
+                        apiFeed = apiFeed.copy(
+                            tasks = apiFeed.tasks.filter { existing ->
+                                existing.id != deletedId.toString()
+                            }
+                        )
+                    },
                     onBack = {
                         navController.popBackStack()
                     }
@@ -642,7 +758,7 @@ fun TodoNavHost(repository: TodoRepository) {
             }
         }
 
-        // Thêm công việc - Giữ chức năng Firebase cũ
+        // POST API: Thêm công việc mới
         composable(AppDestination.AddTask.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {
@@ -654,6 +770,8 @@ fun TodoNavHost(repository: TodoRepository) {
                     onCancel = {
                         navController.popBackStack()
                     },
+
+                    // Giữ callback Firebase cũ để tương thích
                     onSave = { task ->
                         if (uid == null && isGuest) {
                             feed = feed.copy(
@@ -671,6 +789,68 @@ fun TodoNavHost(repository: TodoRepository) {
                                 )
                             }
                         }
+
+                        navController.popBackStack()
+                    },
+
+                    // Luồng chính tuần 04: POST lên Mock API
+                    onSaveApi = { newTask, remind ->
+
+                        val apiCategory = when (newTask.category) {
+                            TodoCategory.STUDY -> "study"
+                            TodoCategory.LIFE -> "life"
+                        }
+
+                        val apiPriority = when (newTask.priority) {
+                            TaskPriority.LOW -> "low"
+                            TaskPriority.MEDIUM -> "medium"
+                            TaskPriority.HIGH -> "high"
+                        }
+
+                        val apiDate = SimpleDateFormat(
+                            "yyyy-MM-dd",
+                            Locale.US
+                        ).format(
+                            Date(newTask.dueAtMillis)
+                        )
+
+                        // Hàm suspend: AddTaskScreen tự xử lý
+                        // loading, lỗi và khóa nút Lưu.
+                        teachingPostApi.createTask(
+                            title = newTask.title,
+                            note = newTask.note,
+                            category = apiCategory,
+                            date = apiDate,
+                            time = newTask.time,
+                            priority = apiPriority,
+                            remind = remind
+                        )
+
+                        // POST thành công.
+                        // Không dùng ID mẫu trong response Mock.
+                        // UUID trong newTask được giữ làm ID tạm.
+                        val localTask = newTask.copy(
+                            id = "local:${newTask.id}"
+                        )
+
+                        locallyCreatedTasks[localTask.id] = localTask
+
+                        apiFeed = apiFeed.copy(
+                            tasks = (
+                                    apiFeed.tasks.filterNot {
+                                        it.id == localTask.id
+                                    } + localTask
+                                    ).sortedBy {
+                                    it.dueAtMillis
+                                },
+                            error = null
+                        )
+
+                        Toast.makeText(
+                            context,
+                            "POST thành công! Đã thêm công việc.",
+                            Toast.LENGTH_SHORT
+                        ).show()
 
                         navController.popBackStack()
                     }
@@ -753,6 +933,7 @@ fun TodoNavHost(repository: TodoRepository) {
         }
     }
 
+    // Hiển thị lỗi Firebase nếu có
     if (operationError != null) {
         AlertDialog(
             onDismissRequest = {
