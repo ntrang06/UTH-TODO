@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.example.uthtodo.data.TeachingTask
 import com.example.uthtodo.data.TeachingTaskApi
 import com.example.uthtodo.data.TeachingTaskPatchApi
+import com.example.uthtodo.data.TeachingTaskDeleteApi
 import com.example.uthtodo.ui.components.DashboardBackground
 import com.example.uthtodo.ui.components.TodoColors
 import kotlinx.coroutines.CancellationException
@@ -30,10 +31,13 @@ fun TaskDetailScreen(
     taskId: Int,
     onBack: () -> Unit,
     cachedTask: TeachingTask? = null,
-    onTaskUpdated: (TeachingTask) -> Unit = {}
+    onTaskUpdated: (TeachingTask) -> Unit = {},
+    onTaskDeleted: (Int) -> Unit = {}
 ) {
     val api = remember { TeachingTaskApi() }
     val patchApi = remember { TeachingTaskPatchApi() }
+    val deleteApi = remember { TeachingTaskDeleteApi() }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -61,7 +65,11 @@ fun TaskDetailScreen(
         mutableStateOf(false)
     }
 
-    // GET API: Lấy chi tiết công việc
+    var showDeleteDialog by remember(taskId) {
+        mutableStateOf(false)
+    }
+
+    // GET API
     LaunchedEffect(taskId, retry) {
         loading = true
         error = null
@@ -78,7 +86,7 @@ fun TaskDetailScreen(
         }
     }
 
-    // Nhận thay đổi từ Navigation
+    // Đồng bộ trạng thái đã PATCH
     LaunchedEffect(cachedTask) {
         if (cachedTask != null && !isUpdating) {
             task = cachedTask
@@ -137,21 +145,24 @@ fun TaskDetailScreen(
         }
     }
 
-    fun toggleSubtask(index: Int, checked: Boolean) {
+    fun toggleSubtask(
+        index: Int,
+        checked: Boolean
+    ) {
         val current = task ?: return
 
         if (isUpdating || index !in current.subtasks.indices) {
             return
         }
 
-        val updatedSubtasks = current.subtasks.mapIndexed {
-                i, sub ->
-            if (i == index) {
-                sub.copy(done = checked)
-            } else {
-                sub
+        val updatedSubtasks =
+            current.subtasks.mapIndexed { i, sub ->
+                if (i == index) {
+                    sub.copy(done = checked)
+                } else {
+                    sub
+                }
             }
-        }
 
         updateTask(
             updated = current.copy(
@@ -159,6 +170,46 @@ fun TaskDetailScreen(
             ),
             successMessage = "Đã cập nhật việc nhỏ!"
         )
+    }
+
+    // DELETE API
+    fun deleteCurrentTask() {
+        val current = task ?: return
+
+        if (isUpdating) return
+
+        scope.launch {
+            isUpdating = true
+
+            try {
+                deleteApi.deleteTask(current.id)
+
+                showDeleteDialog = false
+
+                // Báo Navigation loại công việc khỏi danh sách
+                onTaskDeleted(current.id)
+
+                Toast.makeText(
+                    context,
+                    "Đã xóa công việc!",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                // Trở lại màn Danh sách
+                onBack()
+
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "DELETE thất bại: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isUpdating = false
+            }
+        }
     }
 
     Scaffold(
@@ -175,13 +226,13 @@ fun TaskDetailScreen(
                     onClick = onBack,
                     enabled = !isUpdating
                 ) {
-                    Text("‹ Trang chủ")
+                    Text("‹ Quay lại")
                 }
 
                 Spacer(Modifier.weight(1f))
 
                 Text(
-                    text = "Chi tiết",
+                    "Chi tiết",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -224,24 +275,29 @@ fun TaskDetailScreen(
                                 color = Color.White,
                                 strokeWidth = 2.dp
                             )
+
                             Spacer(Modifier.width(10.dp))
                         }
 
                         Text(
                             when {
-                                isUpdating -> "Đang cập nhật..."
+                                isUpdating -> "Đang xử lý..."
                                 task?.done == true -> "Đã hoàn thành"
                                 else -> "Đánh dấu hoàn thành"
                             }
                         )
                     }
 
-                    // DELETE API sẽ làm bước tiếp theo
                     TextButton(
-                        onClick = {},
-                        enabled = false
+                        onClick = {
+                            showDeleteDialog = true
+                        },
+                        enabled = !isUpdating
                     ) {
-                        Text("Xóa công việc")
+                        Text(
+                            "Xóa công việc",
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -251,7 +307,7 @@ fun TaskDetailScreen(
         when {
             loading -> {
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .fillMaxSize()
                         .padding(padding),
                     contentAlignment = Alignment.Center
@@ -272,6 +328,7 @@ fun TaskDetailScreen(
                         error.orEmpty(),
                         color = MaterialTheme.colorScheme.error
                     )
+
                     Button(onClick = { retry++ }) {
                         Text("Thử lại")
                     }
@@ -291,7 +348,12 @@ fun TaskDetailScreen(
                         .padding(20.dp)
                 ) {
                     Text(
-                        text = if (detail.category == "study") {
+                        text = if (
+                            detail.category.equals(
+                                "study",
+                                ignoreCase = true
+                            )
+                        ) {
                             "Học tập"
                         } else {
                             "Cuộc sống"
@@ -303,7 +365,7 @@ fun TaskDetailScreen(
                     Spacer(Modifier.height(8.dp))
 
                     Text(
-                        text = detail.title,
+                        detail.title,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 31.sp
@@ -326,9 +388,7 @@ fun TaskDetailScreen(
                         )
 
                         HorizontalDivider(
-                            modifier = Modifier.padding(
-                                vertical = 12.dp
-                            )
+                            Modifier.padding(vertical = 12.dp)
                         )
 
                         DetailInfoRow(
@@ -337,14 +397,12 @@ fun TaskDetailScreen(
                         )
 
                         HorizontalDivider(
-                            modifier = Modifier.padding(
-                                vertical = 12.dp
-                            )
+                            Modifier.padding(vertical = 12.dp)
                         )
 
                         DetailInfoRow(
                             "Ưu tiên",
-                            when (detail.priority) {
+                            when (detail.priority.lowercase()) {
                                 "high" -> "Cao"
                                 "low" -> "Thấp"
                                 else -> "Vừa"
@@ -363,7 +421,7 @@ fun TaskDetailScreen(
                     Spacer(Modifier.height(8.dp))
 
                     Text(
-                        text = detail.note.ifBlank {
+                        detail.note.ifBlank {
                             "Không có ghi chú"
                         },
                         modifier = Modifier
@@ -443,7 +501,7 @@ fun TaskDetailScreen(
                                 )
 
                                 Text(
-                                    text = sub.title,
+                                    sub.title,
                                     fontSize = 13.sp,
                                     textDecoration = if (sub.done) {
                                         TextDecoration.LineThrough
@@ -466,7 +524,7 @@ fun TaskDetailScreen(
         }
     }
 
-    // Mở màn sửa công việc
+    // Màn chỉnh sửa đã làm ở phần trước
     if (isEditing && task != null) {
         EditTaskScreen(
             task = task!!,
@@ -485,6 +543,51 @@ fun TaskDetailScreen(
             }
         )
     }
+
+    // Hộp thoại xác nhận DELETE
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isUpdating) {
+                    showDeleteDialog = false
+                }
+            },
+            title = {
+                Text("Xóa công việc?")
+            },
+            text = {
+                Text(
+                    "Bạn có chắc muốn xóa công việc " +
+                            "\"${task?.title.orEmpty()}\" không?"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { deleteCurrentTask() },
+                    enabled = !isUpdating
+                ) {
+                    Text(
+                        if (isUpdating) {
+                            "Đang xóa..."
+                        } else {
+                            "Xóa"
+                        },
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                    },
+                    enabled = !isUpdating
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -497,14 +600,14 @@ private fun DetailInfoRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            label,
             fontSize = 13.sp,
             color = TodoColors.Gray,
             modifier = Modifier.weight(1f)
         )
 
         Text(
-            text = value,
+            value,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium
         )

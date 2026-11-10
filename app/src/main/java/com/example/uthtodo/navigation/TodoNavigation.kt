@@ -34,6 +34,7 @@ sealed class AppDestination(val route: String) {
 
     object Onboarding : AppDestination("onboarding/{pageIndex}") {
         const val PAGE_INDEX = "pageIndex"
+
         fun createRoute(index: Int) = "onboarding/$index"
     }
 
@@ -45,6 +46,7 @@ sealed class AppDestination(val route: String) {
 
     object TaskDetail : AppDestination("task-detail/{taskId}") {
         const val TASK_ID = "taskId"
+
         fun createRoute(id: Int) = "task-detail/$id"
     }
 }
@@ -57,8 +59,13 @@ fun TodoNavHost(repository: TodoRepository) {
     val scope = rememberCoroutineScope()
 
     // API của thầy - Bài tuần 04
-    val teachingApi = remember { TeachingTaskApi() }
-    val teachingPatchApi = remember { TeachingTaskPatchApi() }
+    val teachingApi = remember {
+        TeachingTaskApi()
+    }
+
+    val teachingPatchApi = remember {
+        TeachingTaskPatchApi()
+    }
 
     var apiReload by remember {
         mutableIntStateOf(0)
@@ -73,11 +80,16 @@ fun TodoNavHost(repository: TodoRepository) {
         mutableStateMapOf<Int, TeachingTask>()
     }
 
+    // Lưu ID công việc đã DELETE trong phiên sử dụng
+    val deletedApiTaskIds = remember {
+        mutableStateListOf<Int>()
+    }
+
     var isApiUpdating by remember {
         mutableStateOf(false)
     }
 
-    // Đồng bộ dữ liệu giữa các màn hình
+    // Đồng bộ dữ liệu giữa Trang chủ, Danh sách và Chi tiết
     val applyApiTask: (TeachingTask) -> Unit = { updated ->
         apiOverrides[updated.id] = updated
 
@@ -101,7 +113,12 @@ fun TodoNavHost(repository: TodoRepository) {
 
         try {
             val tasks = teachingApi.getTasks()
+                .filter { serverTask ->
+                    // Không hiển thị lại công việc đã DELETE
+                    serverTask.id !in deletedApiTaskIds
+                }
                 .map { serverTask ->
+                    // Ưu tiên dữ liệu đã PATCH
                     val current = apiOverrides[serverTask.id]
                         ?: serverTask
 
@@ -130,7 +147,11 @@ fun TodoNavHost(repository: TodoRepository) {
     val toggleApiTask: (String) -> Unit = { id ->
         val taskId = id.toIntOrNull()
 
-        if (taskId != null && !isApiUpdating) {
+        if (
+            taskId != null &&
+            taskId !in deletedApiTaskIds &&
+            !isApiUpdating
+        ) {
             scope.launch {
                 isApiUpdating = true
 
@@ -144,7 +165,7 @@ fun TodoNavHost(repository: TodoRepository) {
 
                     teachingPatchApi.updateTask(updated)
 
-                    // Chỉ cập nhật giao diện sau khi PATCH thành công
+                    // Cập nhật giao diện sau PATCH thành công
                     applyApiTask(updated)
 
                     Toast.makeText(
@@ -197,10 +218,21 @@ fun TodoNavHost(repository: TodoRepository) {
         repository.getIllustrationData()
     }
 
-    val taskContent = remember { TaskContent() }
-    val dashboardContent = remember { DashboardContent() }
-    val profileContent = remember { ProfileContent() }
-    val loginContent = remember { LoginContent() }
+    val taskContent = remember {
+        TaskContent()
+    }
+
+    val dashboardContent = remember {
+        DashboardContent()
+    }
+
+    val profileContent = remember {
+        ProfileContent()
+    }
+
+    val loginContent = remember {
+        LoginContent()
+    }
 
     var currentUser by remember {
         mutableStateOf(authRepository.getCurrentUser())
@@ -347,6 +379,7 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
+
             launchSingleTop = true
         }
     }
@@ -366,6 +399,7 @@ fun TodoNavHost(repository: TodoRepository) {
             popUpTo(navController.graph.id) {
                 inclusive = false
             }
+
             launchSingleTop = true
         }
     }
@@ -394,6 +428,7 @@ fun TodoNavHost(repository: TodoRepository) {
                         popUpTo(AppDestination.Splash.route) {
                             inclusive = true
                         }
+
                         launchSingleTop = true
                     }
                 }
@@ -456,6 +491,7 @@ fun TodoNavHost(repository: TodoRepository) {
                             popUpTo(AppDestination.Login.route) {
                                 inclusive = true
                             }
+
                             launchSingleTop = true
                         }
                     }
@@ -613,7 +649,7 @@ fun TodoNavHost(repository: TodoRepository) {
             }
         }
 
-        // Chi tiết - GET và PATCH API
+        // Chi tiết - GET, PATCH và DELETE API
         composable(
             route = AppDestination.TaskDetail.route,
             arguments = listOf(
@@ -635,6 +671,24 @@ fun TodoNavHost(repository: TodoRepository) {
                     taskId = taskId,
                     cachedTask = apiOverrides[taskId],
                     onTaskUpdated = applyApiTask,
+
+                    // DELETE thành công: xóa khỏi dữ liệu chung
+                    onTaskDeleted = { deletedId ->
+                        if (deletedId !in deletedApiTaskIds) {
+                            deletedApiTaskIds.add(deletedId)
+                        }
+
+                        // Bỏ dữ liệu PATCH đã lưu
+                        apiOverrides.remove(deletedId)
+
+                        // Đồng bộ Trang chủ và Danh sách
+                        apiFeed = apiFeed.copy(
+                            tasks = apiFeed.tasks.filter { existing ->
+                                existing.id != deletedId.toString()
+                            }
+                        )
+                    },
+
                     onBack = {
                         navController.popBackStack()
                     }
@@ -753,6 +807,7 @@ fun TodoNavHost(repository: TodoRepository) {
         }
     }
 
+    // Hiển thị lỗi Firebase nếu có
     if (operationError != null) {
         AlertDialog(
             onDismissRequest = {
