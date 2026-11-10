@@ -25,6 +25,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import android.util.Log
 import com.example.uthtodo.data.TeachingTaskApi
+import com.example.uthtodo.data.toTodoTask
 
 sealed class AppDestination(val route: String) {
     object Splash : AppDestination("splash")
@@ -49,9 +50,47 @@ fun TodoNavHost(repository: TodoRepository) {
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
 
+
     val teachingApi = remember {
         TeachingTaskApi()
     }
+
+    var apiReload by remember {
+        mutableIntStateOf(0)
+    }
+
+    var apiFeed by remember {
+        mutableStateOf(TaskFeed())
+    }
+
+    LaunchedEffect(apiReload) {
+        apiFeed = apiFeed.copy(
+            isLoading = true,
+            error = null
+        )
+
+        try {
+            val tasks = teachingApi.getTasks()
+                .map { it.toTodoTask() }
+                .sortedBy { it.dueAtMillis }
+
+            apiFeed = TaskFeed(
+                tasks = tasks,
+                isLoading = false
+            )
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            apiFeed = TaskFeed(
+                tasks = apiFeed.tasks,
+                isLoading = false,
+                error = e.localizedMessage
+                    ?: "Không tải được công việc từ API."
+            )
+        }
+    }
+
 
     LaunchedEffect(teachingApi) {
         try {
@@ -448,9 +487,10 @@ fun TodoNavHost(repository: TodoRepository) {
                     replaceWithLogin()
                 }
             } else {
+
                 HomeScreen(
                     user = currentUser,
-                    feed = feed,
+                    feed = apiFeed,
                     content = dashboardContent,
                     taskContent = taskContent,
                     onProfile = {
@@ -473,10 +513,18 @@ fun TodoNavHost(repository: TodoRepository) {
                         )
                     },
                     onRetry = {
-                        reload++
+                        apiReload++
                     },
-                    onToggleTask = toggleTask
+                    onToggleTask = {
+                        Toast.makeText(
+                            context,
+                            "Chức năng cập nhật API sẽ làm ở bước PATCH",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    apiMode = true
                 )
+
             }
         }
 

@@ -30,11 +30,18 @@ fun HomeScreen(
     onList: () -> Unit,
     onAdd: () -> Unit,
     onRetry: () -> Unit,
-    onToggleTask: (String) -> Unit
+    onToggleTask: (String) -> Unit,
+    apiMode: Boolean = false
 ) {
-    val tasks = feed.tasks.filter {
-        TaskDates.isToday(it)
+
+    val tasks = if (apiMode) {
+        feed.tasks
+    } else {
+        feed.tasks.filter {
+            TaskDates.isToday(it)
+        }
     }
+
 
     val stats = TaskStatistics.from(tasks)
 
@@ -114,7 +121,7 @@ fun HomeScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        content.todayProgress,
+                        if (apiMode) "Tiến độ công việc" else content.todayProgress,
                         color = Color.White,
                         fontSize = 13.sp
                     )
@@ -225,7 +232,7 @@ fun HomeScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    content.todayTasks,
+                    if (apiMode) "Công việc từ API" else content.todayTasks,
                     modifier = Modifier.weight(1f),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
