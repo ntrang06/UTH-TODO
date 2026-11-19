@@ -4,6 +4,7 @@ package com.example.uthtodo.ui.screens
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,15 @@ fun AddTaskScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Bảng màu dùng chung
+    val dark = TodoColors.isDark
+    val background = TodoColors.Background
+    val surface = TodoColors.Surface
+    val ink = TodoColors.Ink
+    val gray = TodoColors.Gray
+    val primary = TodoColors.Blue
+    val line = TodoColors.Line
 
     var title by rememberSaveable {
         mutableStateOf("")
@@ -72,6 +82,58 @@ fun AddTaskScreen(
         mutableStateOf(false)
     }
 
+    // Màu cho các lựa chọn
+    val selectedBackground = if (dark) {
+        primary.copy(alpha = 0.22f)
+    } else {
+        primary.copy(alpha = 0.12f)
+    }
+
+    val selectedTextColor = if (dark) {
+        Color.White
+    } else {
+        primary
+    }
+
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = ink,
+        unfocusedTextColor = ink,
+        disabledTextColor = gray,
+
+        focusedContainerColor = surface,
+        unfocusedContainerColor = surface,
+        disabledContainerColor = surface,
+
+        focusedBorderColor = primary,
+        unfocusedBorderColor = line,
+        disabledBorderColor = line,
+
+        focusedLabelColor = primary,
+        unfocusedLabelColor = gray,
+
+        focusedPlaceholderColor = gray,
+        unfocusedPlaceholderColor = gray,
+
+        cursorColor = primary
+    )
+
+    val chipColors = FilterChipDefaults.filterChipColors(
+        containerColor = surface,
+        labelColor = ink,
+        selectedContainerColor = selectedBackground,
+        selectedLabelColor = selectedTextColor,
+        disabledContainerColor = surface,
+        disabledLabelColor = gray
+    )
+
+    val chipBorder = FilterChipDefaults.filterChipBorder(
+        enabled = true,
+        selected = false,
+        borderColor = line,
+        selectedBorderColor = primary
+    )
+
+    // Lưu công việc
     val save: () -> Unit = save@{
         if (isSaving || submitted) {
             return@save
@@ -107,7 +169,7 @@ fun AddTaskScreen(
         )
 
         if (onSaveApi != null) {
-            // Bài tuần 04: POST API
+            // Giữ chức năng POST API
             scope.launch {
                 isSaving = true
 
@@ -131,11 +193,13 @@ fun AddTaskScreen(
     }
 
     Scaffold(
-        containerColor = DashboardBackground,
+        containerColor = background,
+
         bottomBar = {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(background)
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(20.dp)
@@ -146,7 +210,15 @@ fun AddTaskScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = primary,
+                        contentColor = Color.White,
+                        disabledContainerColor = primary.copy(
+                            alpha = 0.40f
+                        ),
+                        disabledContentColor = Color.White
+                    )
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
@@ -159,11 +231,14 @@ fun AddTaskScreen(
                     }
 
                     Text(
-                        if (isSaving) {
+                        text = if (isSaving) {
                             "Đang gửi POST..."
                         } else {
                             content.saveTask
-                        }
+                        },
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 }
             }
@@ -177,6 +252,8 @@ fun AddTaskScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
+
+            // THANH TIÊU ĐỀ
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -187,7 +264,10 @@ fun AddTaskScreen(
                     onClick = onCancel,
                     enabled = !isSaving
                 ) {
-                    Text(content.cancel)
+                    Text(
+                        text = content.cancel,
+                        color = primary
+                    )
                 }
 
                 Text(
@@ -195,18 +275,28 @@ fun AddTaskScreen(
                     modifier = Modifier.weight(1f),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = ink
                 )
 
                 TextButton(
                     onClick = save,
                     enabled = !isSaving && !submitted
                 ) {
-                    Text(content.save)
+                    Text(
+                        text = content.save,
+                        color = if (isSaving || submitted) {
+                            gray
+                        } else {
+                            primary
+                        }
+                    )
                 }
             }
 
-            // Tên công việc
+            Spacer(Modifier.height(10.dp))
+
+            // TÊN CÔNG VIỆC
             OutlinedTextField(
                 value = title,
                 onValueChange = {
@@ -222,12 +312,13 @@ fun AddTaskScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isSaving,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = textFieldColors
             )
 
             Spacer(Modifier.height(12.dp))
 
-            // Ghi chú
+            // GHI CHÚ
             OutlinedTextField(
                 value = note,
                 onValueChange = {
@@ -244,48 +335,70 @@ fun AddTaskScreen(
                 minLines = 3,
                 maxLines = 6,
                 enabled = !isSaving,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = textFieldColors
             )
 
             Spacer(Modifier.height(20.dp))
 
-            // Danh mục
+            // NHÓM CÔNG VIỆC
             Text(
                 text = content.category,
-                color = TodoColors.Gray,
+                color = gray,
                 fontSize = 13.sp
             )
+
+            Spacer(Modifier.height(8.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 TodoCategory.entries.forEach { item ->
+                    val isSelected = category == item.name
+
                     FilterChip(
-                        selected = category == item.name,
+                        selected = isSelected,
                         onClick = {
                             category = item.name
                         },
                         enabled = !isSaving,
                         label = {
-                            Text(item.title)
+                            Text(
+                                text = item.title,
+                                fontSize = 13.sp,
+                                color = if (isSelected) {
+                                    selectedTextColor
+                                } else {
+                                    ink
+                                }
+                            )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = chipColors,
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = !isSaving,
+                            selected = isSelected,
+                            borderColor = line,
+                            selectedBorderColor = primary
+                        )
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Ngày và giờ
+            // NGÀY VÀ GIỜ
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        Color.White,
+                        surface,
                         RoundedCornerShape(16.dp)
                     )
                     .padding(8.dp)
             ) {
+
+                // CHỌN NGÀY
                 TextButton(
                     onClick = {
                         val date = Calendar.getInstance().apply {
@@ -314,16 +427,22 @@ fun AddTaskScreen(
                     Text(
                         text = content.date,
                         modifier = Modifier.weight(1f),
-                        color = TodoColors.Ink
+                        color = ink
                     )
 
-                    Text(TaskDates.date(dueAt))
+                    Text(
+                        text = TaskDates.date(dueAt),
+                        color = primary,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
                 HorizontalDivider(
-                    color = DashboardBackground
+                    color = line,
+                    thickness = 1.dp
                 )
 
+                // CHỌN GIỜ
                 TextButton(
                     onClick = {
                         val date = Calendar.getInstance().apply {
@@ -353,48 +472,71 @@ fun AddTaskScreen(
                     Text(
                         text = content.time,
                         modifier = Modifier.weight(1f),
-                        color = TodoColors.Ink
+                        color = ink
                     )
 
-                    Text(TaskDates.time(dueAt))
+                    Text(
+                        text = TaskDates.time(dueAt),
+                        color = primary,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // Mức ưu tiên
+            // MỨC ƯU TIÊN
             Text(
                 text = content.priority,
-                color = TodoColors.Gray,
+                color = gray,
                 fontSize = 13.sp
             )
+
+            Spacer(Modifier.height(8.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TaskPriority.entries.forEach { item ->
+                    val isSelected = priority == item.name
+
                     FilterChip(
-                        selected = priority == item.name,
+                        selected = isSelected,
                         onClick = {
                             priority = item.name
                         },
                         enabled = !isSaving,
                         label = {
-                            Text(item.title)
+                            Text(
+                                text = item.title,
+                                fontSize = 13.sp,
+                                color = if (isSelected) {
+                                    selectedTextColor
+                                } else {
+                                    ink
+                                }
+                            )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = chipColors,
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = !isSaving,
+                            selected = isSelected,
+                            borderColor = line,
+                            selectedBorderColor = primary
+                        )
                     )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Nhắc nhở
+            // NHẮC NHỞ
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        Color.White,
+                        surface,
                         RoundedCornerShape(16.dp)
                     )
                     .padding(
@@ -407,7 +549,7 @@ fun AddTaskScreen(
                     text = "Nhắc nhở",
                     modifier = Modifier.weight(1f),
                     fontSize = 14.sp,
-                    color = TodoColors.Ink
+                    color = ink
                 )
 
                 Switch(
@@ -415,13 +557,24 @@ fun AddTaskScreen(
                     onCheckedChange = {
                         remind = it
                     },
-                    enabled = !isSaving
+                    enabled = !isSaving,
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = primary,
+                        checkedThumbColor = Color.White,
+                        uncheckedTrackColor = if (dark) {
+                            Color(0xFF48484E)
+                        } else {
+                            Color(0xFFD3D3D9)
+                        },
+                        uncheckedThumbColor = Color.White,
+                        uncheckedBorderColor = line
+                    )
                 )
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Hiển thị lỗi nếu POST thất bại
+            // LỖI KHI GỬI API
             error?.let { message ->
                 Text(
                     text = message,
@@ -430,16 +583,19 @@ fun AddTaskScreen(
                 )
             }
 
+            // TRẠNG THÁI ĐANG LƯU
             if (isSaving) {
                 Spacer(Modifier.height(8.dp))
 
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    color = primary,
+                    trackColor = line
                 )
 
                 Text(
                     text = "Đang gửi dữ liệu lên API...",
-                    color = TodoColors.Gray,
+                    color = gray,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 8.dp)
                 )
