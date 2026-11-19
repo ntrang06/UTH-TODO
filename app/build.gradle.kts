@@ -95,4 +95,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Chapter 12 - Lưu trữ cài đặt bằng DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
 }

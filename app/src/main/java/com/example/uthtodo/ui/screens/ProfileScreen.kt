@@ -8,16 +8,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.uthtodo.data.SettingsRepository
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.components.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -33,6 +36,19 @@ fun ProfileScreen(
     }
 
     val stats = TaskStatistics.from(tasks)
+
+    // Chapter 12 - Lưu cài đặt bằng DataStore
+    val context = LocalContext.current
+
+    val settingsRepository = remember(context) {
+        SettingsRepository(context.applicationContext)
+    }
+
+    val notificationsEnabled by settingsRepository
+        .notificationsEnabled
+        .collectAsState(initial = true)
+
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = DashboardBackground,
@@ -96,6 +112,7 @@ fun ProfileScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Thanh tiêu đề
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -128,6 +145,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // Ảnh đại diện
             UserAvatar(
                 user = user,
                 fallback = "UT",
@@ -136,6 +154,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // Tên người dùng
             Text(
                 text = user?.displayName ?: content.guestName,
                 fontSize = 23.sp,
@@ -145,6 +164,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(4.dp))
 
+            // Email hoặc thông tin khách
             Text(
                 text = if (user == null) {
                     content.guestDescription
@@ -302,6 +322,61 @@ fun ProfileScreen(
                     }
                 }
             }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Chapter 12 - Cài đặt ứng dụng bằng DataStore
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = Color.White,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Cài đặt ứng dụng",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Bật thông báo",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(
+                            text = "Lưu trạng thái bằng DataStore",
+                            fontSize = 11.sp,
+                            color = TodoColors.Gray
+                        )
+                    }
+
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsRepository
+                                    .setNotificationsEnabled(enabled)
+                            }
+                        }
+                    )
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
         }
     }
