@@ -12,11 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.uthtodo.data.SettingsRepository
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.components.*
@@ -32,30 +32,46 @@ fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     BackHandler(enabled = isLoggingOut) {
-        // Chờ thao tác đăng xuất kết thúc.
+        // Không cho quay lại khi đang đăng xuất
     }
 
     val stats = TaskStatistics.from(tasks)
 
-    // Chapter 12 - Lưu cài đặt bằng DataStore
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val settingsRepository = remember(context) {
         SettingsRepository(context.applicationContext)
     }
 
-    val notificationsEnabled by settingsRepository
-        .notificationsEnabled
-        .collectAsState(initial = true)
+    val notificationsEnabled by
+    settingsRepository.notificationsEnabled.collectAsState(
+        initial = true
+    )
 
-    val scope = rememberCoroutineScope()
+    val background = TodoColors.Background
+    val surface = TodoColors.Surface
+    val ink = TodoColors.Ink
+    val gray = TodoColors.Gray
+    val primary = TodoColors.Blue
+    val line = TodoColors.Line
+    val dark = TodoColors.isDark
+
+    val logoutColor = if (user == null) {
+        primary
+    } else {
+        if (dark) Color(0xFFFF766B)
+        else Color(0xFFDB3B24)
+    }
 
     Scaffold(
-        containerColor = DashboardBackground,
+        containerColor = background,
+
         bottomBar = {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(background)
                     .navigationBarsPadding()
                     .padding(20.dp)
             ) {
@@ -64,25 +80,23 @@ fun ProfileScreen(
                     enabled = !isLoggingOut,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
-                        .background(
-                            color = Color.White,
-                            shape = RoundedCornerShape(14.dp)
-                        )
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = surface,
+                        contentColor = logoutColor
+                    )
                 ) {
                     if (isLoggingOut) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
+                            color = logoutColor,
                             strokeWidth = 2.dp
                         )
                     } else {
                         DashboardSymbol(
                             icon = DashboardIcon.LOGOUT,
-                            color = if (user == null) {
-                                TodoColors.Blue
-                            } else {
-                                Color(0xFFDB3B24)
-                            }
+                            color = logoutColor
                         )
                     }
 
@@ -94,16 +108,15 @@ fun ProfileScreen(
                             user == null -> content.login
                             else -> content.logout
                         },
-                        color = if (user == null) {
-                            TodoColors.Blue
-                        } else {
-                            Color(0xFFDB3B24)
-                        }
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = logoutColor
                     )
                 }
             }
         }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -112,7 +125,8 @@ fun ProfileScreen(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Thanh tiêu đề
+
+            // THANH TIÊU ĐỀ
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -121,31 +135,40 @@ fun ProfileScreen(
             ) {
                 Text(
                     text = content.title,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
+                    color = ink
                 )
 
                 TextButton(
                     onClick = onBack,
                     enabled = !isLoggingOut,
-                    modifier = Modifier.align(Alignment.CenterStart)
+                    modifier = Modifier.align(
+                        Alignment.CenterStart
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = 0.dp
+                    )
                 ) {
                     DashboardSymbol(
                         icon = DashboardIcon.BACK,
-                        color = TodoColors.Blue,
+                        color = primary,
                         modifier = Modifier.size(16.dp)
                     )
 
+                    Spacer(Modifier.width(3.dp))
+
                     Text(
                         text = content.back,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        color = primary
                     )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // Ảnh đại diện
+            // AVATAR
             UserAvatar(
                 user = user,
                 fallback = "UT",
@@ -154,17 +177,19 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Tên người dùng
+            // TÊN NGƯỜI DÙNG
             Text(
-                text = user?.displayName ?: content.guestName,
+                text = user?.displayName
+                    ?: content.guestName,
                 fontSize = 23.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = ink
             )
 
             Spacer(Modifier.height(4.dp))
 
-            // Email hoặc thông tin khách
+            // EMAIL
             Text(
                 text = if (user == null) {
                     content.guestDescription
@@ -174,20 +199,29 @@ fun ProfileScreen(
                     }
                 },
                 fontSize = 12.sp,
-                color = TodoColors.Gray,
+                color = gray,
                 textAlign = TextAlign.Center
             )
 
+            // LIÊN KẾT GOOGLE
             if (user != null) {
                 Spacer(Modifier.height(8.dp))
 
                 Text(
                     text = "✓ ${content.googleLinked}",
                     fontSize = 10.sp,
-                    color = Color(0xFF16805D),
+                    color = if (dark) {
+                        Color(0xFF79D9B2)
+                    } else {
+                        Color(0xFF16805D)
+                    },
                     modifier = Modifier
                         .background(
-                            color = Color(0xFFDCF5EB),
+                            color = if (dark) {
+                                Color(0xFF193B31)
+                            } else {
+                                Color(0xFFDCF5EB)
+                            },
                             shape = RoundedCornerShape(6.dp)
                         )
                         .padding(
@@ -199,14 +233,19 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Thống kê công việc
+            // BA THẺ THỐNG KÊ
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
                 val items = listOf(
-                    stats.completed.toString() to content.completed,
-                    stats.pending.toString() to content.pending,
-                    "${stats.percent}%" to content.completion
+                    stats.completed.toString() to
+                            content.completed,
+                    stats.pending.toString() to
+                            content.pending,
+                    "${stats.percent}%" to
+                            content.completion
                 )
 
                 items.forEach { (value, label) ->
@@ -214,7 +253,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .weight(1f)
                             .background(
-                                color = Color.White,
+                                color = surface,
                                 shape = RoundedCornerShape(14.dp)
                             )
                             .padding(
@@ -225,13 +264,16 @@ fun ProfileScreen(
                         Text(
                             text = value,
                             fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = ink
                         )
+
+                        Spacer(Modifier.height(4.dp))
 
                         Text(
                             text = label,
                             fontSize = 10.sp,
-                            color = TodoColors.Gray
+                            color = gray
                         )
                     }
                 }
@@ -239,12 +281,12 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // Biểu đồ công việc trong tuần
+            // BIỂU ĐỒ TUẦN
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color.White,
+                        color = surface,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .padding(16.dp)
@@ -256,13 +298,14 @@ fun ProfileScreen(
                         text = content.weekTitle,
                         modifier = Modifier.weight(1f),
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = ink
                     )
 
                     Text(
                         text = content.weekDescription,
                         fontSize = 10.sp,
-                        color = TodoColors.Gray
+                        color = gray
                     )
                 }
 
@@ -271,24 +314,27 @@ fun ProfileScreen(
                 val days = content.weekProgress(tasks)
 
                 val maxCompleted = days
-                    .maxOf { it.completed }
-                    .coerceAtLeast(1)
+                    .maxOfOrNull { it.completed }
+                    ?.coerceAtLeast(1) ?: 1
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     days.forEach { day ->
                         Column(
                             modifier = Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally
                         ) {
                             Box(
                                 modifier = Modifier
                                     .height(64.dp)
                                     .fillMaxWidth(),
-                                contentAlignment = Alignment.BottomCenter
+                                contentAlignment =
+                                    Alignment.BottomCenter
                             ) {
                                 val barHeight = (
                                         6f +
@@ -302,9 +348,9 @@ fun ProfileScreen(
                                         .height(barHeight)
                                         .background(
                                             color = if (day.isToday) {
-                                                TodoColors.Blue
+                                                primary
                                             } else {
-                                                TodoColors.Line
+                                                line
                                             },
                                             shape = RoundedCornerShape(5.dp)
                                         )
@@ -316,7 +362,7 @@ fun ProfileScreen(
                             Text(
                                 text = day.label,
                                 fontSize = 10.sp,
-                                color = TodoColors.Gray
+                                color = gray
                             )
                         }
                     }
@@ -325,23 +371,25 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Chapter 12 - Cài đặt ứng dụng bằng DataStore
+            // CÀI ĐẶT ỨNG DỤNG TRONG HỒ SƠ
+            // Giữ công tắc DataStore đã có
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color.White,
-                        shape = RoundedCornerShape(16.dp)
+                        surface,
+                        RoundedCornerShape(16.dp)
                     )
                     .padding(16.dp)
             ) {
                 Text(
                     text = "Cài đặt ứng dụng",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ink
                 )
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -352,8 +400,8 @@ fun ProfileScreen(
                     ) {
                         Text(
                             text = "Bật thông báo",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 13.sp,
+                            color = ink
                         )
 
                         Spacer(Modifier.height(4.dp))
@@ -361,7 +409,7 @@ fun ProfileScreen(
                         Text(
                             text = "Lưu trạng thái bằng DataStore",
                             fontSize = 11.sp,
-                            color = TodoColors.Gray
+                            color = gray
                         )
                     }
 
@@ -372,7 +420,17 @@ fun ProfileScreen(
                                 settingsRepository
                                     .setNotificationsEnabled(enabled)
                             }
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = Color(0xFF35C56A),
+                            checkedThumbColor = Color.White,
+                            uncheckedTrackColor = if (dark) {
+                                Color(0xFF49494F)
+                            } else {
+                                Color(0xFFD3D3D9)
+                            },
+                            uncheckedThumbColor = Color.White
+                        )
                     )
                 }
             }

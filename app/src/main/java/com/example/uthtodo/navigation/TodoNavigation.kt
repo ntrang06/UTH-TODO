@@ -11,6 +11,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,6 +28,7 @@ import com.example.uthtodo.data.TeachingTaskPostApi
 import com.example.uthtodo.data.toTodoTask
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.screens.*
+import com.example.uthtodo.viewmodel.NotificationViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -44,9 +46,11 @@ sealed class AppDestination(val route: String) {
 
     object Login : AppDestination("login")
     object Home : AppDestination("home")
+    object Notification : AppDestination("notification")
     object Profile : AppDestination("profile")
     object TaskList : AppDestination("tasks")
     object AddTask : AppDestination("add-task")
+    object Settings : AppDestination("settings")
 
     object TaskDetail : AppDestination("task-detail/{taskId}") {
         const val TASK_ID = "taskId"
@@ -640,6 +644,20 @@ fun TodoNavHost(repository: TodoRepository) {
                             launchSingleTop = true
                         }
                     },
+                    onNotifications = {
+                        navController.navigate(
+                            AppDestination.Notification.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onSettings = {
+                        navController.navigate(
+                            AppDestination.Settings.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
                     onList = {
                         navController.navigate(
                             AppDestination.TaskList.route
@@ -657,6 +675,63 @@ fun TodoNavHost(repository: TodoRepository) {
                     },
                     onToggleTask = toggleApiTask,
                     apiMode = true
+                )
+            }
+        }
+
+        // Màn Thông báo - MVVM
+        composable(AppDestination.Notification.route) {
+            if (currentUser == null && !isGuest) {
+                LaunchedEffect(Unit) {
+                    replaceWithLogin()
+                }
+            } else {
+                val notificationViewModel: NotificationViewModel = viewModel()
+
+                NotificationScreen(
+                    notifications = notificationViewModel.notifications,
+                    dashboard = dashboardContent,
+
+                    onMarkAllRead = {
+                        notificationViewModel.markAllAsRead()
+                    },
+
+                    onDeleteNotification = { id ->
+                        notificationViewModel.deleteNotification(id)
+                    },
+
+                    onAddTask = {
+                        navController.navigate(
+                            AppDestination.AddTask.route
+                        )
+                    },
+
+                    onHome = {
+                        navController.navigate(
+                            AppDestination.Home.route
+                        ) {
+                            popUpTo(AppDestination.Home.route) {
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onList = {
+                        navController.navigate(
+                            AppDestination.TaskList.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onSettings = {
+                        navController.navigate(
+                            AppDestination.Settings.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }
@@ -687,6 +762,25 @@ fun TodoNavHost(repository: TodoRepository) {
                     onRetry = {
                         apiReload++
                     },
+
+                    // Mở màn Thông báo
+                    onNotifications = {
+                        navController.navigate(
+                            AppDestination.Notification.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    // Mở màn Cài đặt riêng
+                    onSettings = {
+                        navController.navigate(
+                            AppDestination.Settings.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
                     onOpenTask = { id ->
                         if (locallyCreatedTasks.containsKey(id)) {
                             Toast.makeText(
@@ -853,6 +947,49 @@ fun TodoNavHost(repository: TodoRepository) {
                         ).show()
 
                         navController.popBackStack()
+                    }
+                )
+            }
+        }
+
+        // Cài đặt - riêng biệt với Hồ sơ
+        composable(AppDestination.Settings.route) {
+            if (currentUser == null && !isGuest) {
+                LaunchedEffect(Unit) {
+                    replaceWithLogin()
+                }
+            } else {
+                SettingsScreen(
+                    dashboard = dashboardContent,
+
+                    onHome = {
+                        navController.navigate(
+                            AppDestination.Home.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onList = {
+                        navController.navigate(
+                            AppDestination.TaskList.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
+
+                    onAdd = {
+                        navController.navigate(
+                            AppDestination.AddTask.route
+                        )
+                    },
+
+                    onNotifications = {
+                        navController.navigate(
+                            AppDestination.Notification.route
+                        ) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }

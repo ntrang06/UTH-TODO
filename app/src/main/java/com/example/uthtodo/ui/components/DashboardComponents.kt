@@ -1,3 +1,4 @@
+
 package com.example.uthtodo.ui.components
 
 import androidx.compose.foundation.Canvas
@@ -23,7 +24,8 @@ import androidx.compose.ui.unit.sp
 import com.example.uthtodo.model.AppUser
 import com.example.uthtodo.model.DashboardContent
 
-val DashboardBackground = Color(0xFFF5F5F8)
+val DashboardBackground: Color
+    get() = TodoColors.Background
 
 enum class DashboardIcon {
     HOME, STUDY, LIFE, LIST, BELL, SETTINGS, PLUS, BACK, LOGOUT
@@ -37,11 +39,23 @@ fun DashboardSymbol(
 ) {
     Canvas(modifier.size(24.dp)) {
         withTransform({
-            scale(size.width / 24f, size.height / 24f, Offset.Zero)
+            scale(
+                size.width / 24f,
+                size.height / 24f,
+                Offset.Zero
+            )
         }) {
-            val stroke = Stroke(width = 1.6f, cap = StrokeCap.Round)
+            val stroke = Stroke(
+                width = 1.6f,
+                cap = StrokeCap.Round
+            )
 
-            fun line(x1: Float, y1: Float, x2: Float, y2: Float) {
+            fun line(
+                x1: Float,
+                y1: Float,
+                x2: Float,
+                y2: Float
+            ) {
                 drawLine(
                     color,
                     Offset(x1, y1),
@@ -51,13 +65,18 @@ fun DashboardSymbol(
                 )
             }
 
-            fun path(points: List<Offset>, closed: Boolean = false) {
+            fun path(
+                points: List<Offset>,
+                closed: Boolean = false
+            ) {
                 drawPath(
                     Path().apply {
                         moveTo(points[0].x, points[0].y)
+
                         points.drop(1).forEach {
                             lineTo(it.x, it.y)
                         }
+
                         if (closed) close()
                     },
                     color,
@@ -66,7 +85,8 @@ fun DashboardSymbol(
             }
 
             when (icon) {
-                DashboardIcon.HOME, DashboardIcon.LIFE -> {
+                DashboardIcon.HOME,
+                DashboardIcon.LIFE -> {
                     path(
                         listOf(
                             Offset(3f, 11f),
@@ -113,10 +133,16 @@ fun DashboardSymbol(
                     line(22f, 8f, 22f, 16f)
                 }
 
-                DashboardIcon.LIST -> repeat(3) { index ->
-                    val y = 6f + index * 6f
-                    drawCircle(color, 1f, Offset(4f, y))
-                    line(8f, y, 21f, y)
+                DashboardIcon.LIST -> {
+                    repeat(3) { index ->
+                        val y = 6f + index * 6f
+                        drawCircle(
+                            color,
+                            1f,
+                            Offset(4f, y)
+                        )
+                        line(8f, y, 21f, y)
+                    }
                 }
 
                 DashboardIcon.BELL -> {
@@ -125,7 +151,11 @@ fun DashboardSymbol(
                             moveTo(4f, 18f)
                             lineTo(6f, 15f)
                             lineTo(6f, 10f)
-                            cubicTo(6f, 2f, 18f, 2f, 18f, 10f)
+                            cubicTo(
+                                6f, 2f,
+                                18f, 2f,
+                                18f, 10f
+                            )
                             lineTo(18f, 15f)
                             lineTo(20f, 18f)
                             close()
@@ -145,13 +175,26 @@ fun DashboardSymbol(
                     )
                 }
 
-                DashboardIcon.SETTINGS -> repeat(3) { index ->
-                    val y = 6f + index * 6f
-                    val x = if (index == 1) 9f else 16f
+                DashboardIcon.SETTINGS -> {
+                    repeat(3) { index ->
+                        val y = 6f + index * 6f
+                        val x = if (index == 1) 9f else 16f
 
-                    line(3f, y, 21f, y)
-                    drawCircle(Color.White, 2.3f, Offset(x, y))
-                    drawCircle(color, 2.3f, Offset(x, y), style = stroke)
+                        line(3f, y, 21f, y)
+
+                        drawCircle(
+                            Color.White,
+                            2.3f,
+                            Offset(x, y)
+                        )
+
+                        drawCircle(
+                            color,
+                            2.3f,
+                            Offset(x, y),
+                            style = stroke
+                        )
+                    }
                 }
 
                 DashboardIcon.PLUS -> {
@@ -159,13 +202,15 @@ fun DashboardSymbol(
                     line(12f, 5f, 12f, 19f)
                 }
 
-                DashboardIcon.BACK -> path(
-                    listOf(
-                        Offset(15f, 5f),
-                        Offset(8f, 12f),
-                        Offset(15f, 19f)
+                DashboardIcon.BACK -> {
+                    path(
+                        listOf(
+                            Offset(15f, 5f),
+                            Offset(8f, 12f),
+                            Offset(15f, 19f)
+                        )
                     )
-                )
+                }
 
                 DashboardIcon.LOGOUT -> {
                     path(
@@ -199,13 +244,16 @@ fun UserAvatar(
     size: Dp = 44.dp
 ) {
     Box(
-        Modifier
+        modifier = Modifier
             .size(size)
-            .background(TodoColors.Pale, CircleShape),
+            .background(
+                TodoColors.Pale,
+                CircleShape
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            user?.initials() ?: fallback,
+            text = user?.initials() ?: fallback,
             color = TodoColors.Blue,
             fontWeight = FontWeight.Bold,
             fontSize = (size.value * 0.36f).sp
@@ -219,51 +267,73 @@ fun DashboardBottomBar(
     selected: DashboardIcon = DashboardIcon.HOME,
     onHome: () -> Unit = {},
     onList: () -> Unit = {},
-    onAdd: () -> Unit = {}
+    onAdd: () -> Unit = {},
+    onNotifications: () -> Unit = {},
+    onSettings: () -> Unit = {}
 ) {
     Row(
-        Modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(TodoColors.Surface)
             .navigationBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .padding(
+                horizontal = 8.dp,
+                vertical = 10.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         DashboardTab(
-            DashboardIcon.HOME,
-            content.homeTab,
-            selected == DashboardIcon.HOME,
-            onHome
+            icon = DashboardIcon.HOME,
+            label = content.homeTab,
+            selected = selected == DashboardIcon.HOME,
+            action = onHome
         )
 
         DashboardTab(
-            DashboardIcon.LIST,
-            content.listTab,
-            selected == DashboardIcon.LIST,
-            onList
+            icon = DashboardIcon.LIST,
+            label = content.listTab,
+            selected = selected == DashboardIcon.LIST,
+            action = onList
         )
 
         Box(
-            Modifier.weight(1f),
+            modifier = Modifier.weight(1f),
             contentAlignment = Alignment.Center
         ) {
             Box(
-                Modifier
+                modifier = Modifier
                     .offset(y = (-10).dp)
                     .size(52.dp)
-                    .background(TodoColors.Blue, CircleShape)
+                    .background(
+                        TodoColors.Blue,
+                        CircleShape
+                    )
                     .clickable(
                         onClickLabel = content.addTask,
                         onClick = onAdd
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                DashboardSymbol(DashboardIcon.PLUS, Color.White)
+                DashboardSymbol(
+                    icon = DashboardIcon.PLUS,
+                    color = Color.White
+                )
             }
         }
 
-        DashboardTab(DashboardIcon.BELL, content.notificationsTab)
-        DashboardTab(DashboardIcon.SETTINGS, content.settingsTab)
+        DashboardTab(
+            icon = DashboardIcon.BELL,
+            label = content.notificationsTab,
+            selected = selected == DashboardIcon.BELL,
+            action = onNotifications
+        )
+
+        DashboardTab(
+            icon = DashboardIcon.SETTINGS,
+            label = content.settingsTab,
+            selected = selected == DashboardIcon.SETTINGS,
+            action = onSettings
+        )
     }
 }
 
@@ -274,10 +344,14 @@ private fun RowScope.DashboardTab(
     selected: Boolean = false,
     action: (() -> Unit)? = null
 ) {
-    val color = if (selected) TodoColors.Blue else TodoColors.Gray
+    val color = if (selected) {
+        TodoColors.Blue
+    } else {
+        TodoColors.Gray
+    }
 
     Column(
-        Modifier
+        modifier = Modifier
             .weight(1f)
             .then(
                 if (action != null) {
@@ -289,12 +363,15 @@ private fun RowScope.DashboardTab(
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        DashboardSymbol(icon, color)
+        DashboardSymbol(
+            icon = icon,
+            color = color
+        )
 
         Spacer(Modifier.height(3.dp))
 
         Text(
-            label,
+            text = label,
             color = color,
             fontSize = 9.sp,
             maxLines = 1

@@ -95,6 +95,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
 
     // Chapter 12 - Lưu trữ cài đặt bằng DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.7")

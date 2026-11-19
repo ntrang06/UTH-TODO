@@ -1,7 +1,9 @@
+
 package com.example.uthtodo.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.components.*
-import androidx.compose.foundation.clickable
 
 @Composable
 fun TaskListScreen(
@@ -32,6 +33,8 @@ fun TaskListScreen(
     dashboard: DashboardContent,
     onHome: () -> Unit,
     onAdd: () -> Unit,
+    onNotifications: () -> Unit,
+    onSettings: () -> Unit,
     onToggle: (String) -> Unit,
     onRetry: () -> Unit,
     onOpenTask: (String) -> Unit = {}
@@ -45,44 +48,61 @@ fun TaskListScreen(
     }
 
     val visible = feed.tasks.filter {
-        (category.isEmpty() || it.category.name == category) &&
+        (category.isEmpty() ||
+                it.category.name == category) &&
                 (
-                        it.title.contains(query.trim(), ignoreCase = true) ||
-                                it.note.contains(query.trim(), ignoreCase = true)
+                        it.title.contains(
+                            query.trim(),
+                            ignoreCase = true
+                        ) ||
+                                it.note.contains(
+                                    query.trim(),
+                                    ignoreCase = true
+                                )
                         )
     }
 
+    val background = TodoColors.Background
+    val ink = TodoColors.Ink
+    val gray = TodoColors.Gray
+
     Scaffold(
-        containerColor = DashboardBackground,
+        containerColor = background,
         bottomBar = {
             DashboardBottomBar(
                 content = dashboard,
                 selected = DashboardIcon.LIST,
                 onHome = onHome,
-                onAdd = onAdd
+                onAdd = onAdd,
+                onNotifications = onNotifications,
+                onSettings = onSettings
             )
         }
     ) { padding ->
+
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(Modifier.height(20.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    content.listTitle,
-                    Modifier.weight(1f),
+                    text = content.listTitle,
+                    modifier = Modifier.weight(1f),
                     fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = ink
                 )
 
                 Text(
-                    content.pendingCount(feed.tasks),
+                    text = content.pendingCount(feed.tasks),
                     fontSize = 11.sp,
-                    color = TodoColors.Gray
+                    color = gray
                 )
             }
 
@@ -91,36 +111,68 @@ fun TaskListScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text(content.search) },
+                placeholder = {
+                    Text(content.search)
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = ink,
+                    unfocusedTextColor = ink,
+                    focusedContainerColor =
+                        TodoColors.Surface,
+                    unfocusedContainerColor =
+                        TodoColors.Surface,
+                    focusedBorderColor = TodoColors.Blue,
+                    unfocusedBorderColor = TodoColors.Line,
+                    focusedPlaceholderColor = gray,
+                    unfocusedPlaceholderColor = gray
+                )
             )
 
+            Spacer(Modifier.height(8.dp))
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = category.isEmpty(),
-                    onClick = { category = "" },
-                    label = { Text(content.all) }
+                    onClick = {
+                        category = ""
+                    },
+                    label = {
+                        Text(content.all)
+                    }
                 )
 
                 TodoCategory.entries.forEach { item ->
                     FilterChip(
                         selected = category == item.name,
-                        onClick = { category = item.name },
-                        label = { Text(item.title) }
+                        onClick = {
+                            category = item.name
+                        },
+                        label = {
+                            Text(item.title)
+                        }
                     )
                 }
             }
 
-            TaskSyncBanner(feed, content, onRetry)
+            TaskSyncBanner(
+                feed = feed,
+                content = content,
+                onRetry = onRetry
+            )
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 20.dp)
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(
+                    bottom = 20.dp
+                )
             ) {
                 if (
                     visible.isEmpty() &&
@@ -129,13 +181,15 @@ fun TaskListScreen(
                 ) {
                     item {
                         Text(
-                            if (feed.tasks.isEmpty()) {
+                            text = if (feed.tasks.isEmpty()) {
                                 content.empty
                             } else {
                                 content.noResults
                             },
-                            Modifier.padding(vertical = 24.dp),
-                            color = TodoColors.Gray
+                            modifier = Modifier.padding(
+                                vertical = 24.dp
+                            ),
+                            color = gray
                         )
                     }
                 }
@@ -153,9 +207,11 @@ fun TaskListScreen(
                     if (group.isNotEmpty()) {
                         item {
                             Text(
-                                title,
-                                Modifier.padding(top = 12.dp),
-                                color = TodoColors.Gray,
+                                text = title,
+                                modifier = Modifier.padding(
+                                    top = 12.dp
+                                ),
+                                color = gray,
                                 fontSize = 12.sp
                             )
                         }
@@ -198,23 +254,24 @@ fun TaskSyncBanner(
 
     if (message != null) {
         Row(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (feed.isLoading) {
                 CircularProgressIndicator(
-                    Modifier.size(16.dp),
-                    strokeWidth = 2.dp
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = TodoColors.Blue
                 )
 
                 Spacer(Modifier.width(8.dp))
             }
 
             Text(
-                message,
-                Modifier.weight(1f),
+                text = message,
+                modifier = Modifier.weight(1f),
                 fontSize = 12.sp,
                 color = if (feed.error != null) {
                     MaterialTheme.colorScheme.error
@@ -224,7 +281,9 @@ fun TaskSyncBanner(
             )
 
             if (feed.error != null) {
-                TextButton(onClick = onRetry) {
+                TextButton(
+                    onClick = onRetry
+                ) {
                     Text(content.retry)
                 }
             }
@@ -232,6 +291,7 @@ fun TaskSyncBanner(
     }
 }
 
+// Component dùng chung cho Trang chủ và Danh sách
 @Composable
 fun TaskRow(
     task: TodoTask,
@@ -239,12 +299,18 @@ fun TaskRow(
     onToggle: (String) -> Unit,
     showDate: Boolean = false,
     onOpen: (() -> Unit)? = null
-){
+) {
+    val dark = TodoColors.isDark
+    val surface = TodoColors.Surface
+    val ink = TodoColors.Ink
+    val gray = TodoColors.Gray
+    val primary = TodoColors.Blue
+
     Row(
-        Modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(
-                Color.White,
+                surface,
                 RoundedCornerShape(16.dp)
             )
             .padding(
@@ -254,49 +320,54 @@ fun TaskRow(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
+
+        // Đánh dấu hoàn thành
         Box(
-            Modifier
+            modifier = Modifier
                 .size(48.dp)
                 .toggleable(
                     value = task.isCompleted,
                     role = Role.Checkbox,
-                    onValueChange = { onToggle(task.id) }
+                    onValueChange = {
+                        onToggle(task.id)
+                    }
                 )
                 .semantics {
-                    contentDescription = task.title + ": " +
-                            if (task.isCompleted) {
-                                content.markPending
-                            } else {
-                                content.markDone
-                            }
+                    contentDescription =
+                        task.title + ": " +
+                                if (task.isCompleted) {
+                                    content.markPending
+                                } else {
+                                    content.markDone
+                                }
                 },
             contentAlignment = Alignment.Center
         ) {
             Box(
-                Modifier
+                modifier = Modifier
                     .size(22.dp)
                     .background(
-                        if (task.isCompleted) {
-                            TodoColors.Blue
+                        color = if (task.isCompleted) {
+                            primary
                         } else {
-                            Color.White
+                            surface
                         },
-                        CircleShape
+                        shape = CircleShape
                     )
                     .border(
-                        1.5.dp,
-                        if (task.isCompleted) {
-                            TodoColors.Blue
+                        width = 1.5.dp,
+                        color = if (task.isCompleted) {
+                            primary
                         } else {
                             TodoColors.Dot
                         },
-                        CircleShape
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 if (task.isCompleted) {
                     Text(
-                        "✓",
+                        text = "✓",
                         color = Color.White,
                         fontSize = 14.sp
                     )
@@ -304,6 +375,7 @@ fun TaskRow(
             }
         }
 
+        // Thông tin công việc
         Column(
             modifier = if (onOpen != null) {
                 Modifier
@@ -314,12 +386,16 @@ fun TaskRow(
             }
         ) {
             Text(
-                task.title,
+                text = task.title,
                 fontSize = 13.sp,
                 color = if (task.isCompleted) {
-                    Color(0xFF98989D)
+                    if (dark) {
+                        Color(0xFF8C8C94)
+                    } else {
+                        Color(0xFF98989D)
+                    }
                 } else {
-                    TodoColors.Ink
+                    ink
                 },
                 textDecoration = if (task.isCompleted) {
                     TextDecoration.LineThrough
@@ -328,24 +404,49 @@ fun TaskRow(
                 }
             )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val study = task.category == TodoCategory.STUDY
+            Spacer(Modifier.height(3.dp))
 
-                Text(
-                    task.category.title,
-                    fontSize = 10.sp,
-                    color = if (study) {
-                        TodoColors.Blue
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val study =
+                    task.category == TodoCategory.STUDY
+
+                val categoryBackground = if (study) {
+                    if (dark) {
+                        Color(0xFF293452)
+                    } else {
+                        TodoColors.Pale
+                    }
+                } else {
+                    if (dark) {
+                        Color(0xFF422B1A)
+                    } else {
+                        Color(0xFFFFEEDC)
+                    }
+                }
+
+                val categoryColor = if (study) {
+                    if (dark && primary == Color(0xFF315BEF)) {
+                        Color(0xFF93B1FF)
+                    } else {
+                        primary
+                    }
+                } else {
+                    if (dark) {
+                        Color(0xFFFFAF68)
                     } else {
                         Color(0xFF9B602C)
-                    },
+                    }
+                }
+
+                Text(
+                    text = task.category.title,
+                    fontSize = 10.sp,
+                    color = categoryColor,
                     modifier = Modifier
                         .background(
-                            if (study) {
-                                TodoColors.Pale
-                            } else {
-                                Color(0xFFFFEEDC)
-                            },
+                            categoryBackground,
                             RoundedCornerShape(4.dp)
                         )
                         .padding(horizontal = 5.dp)
@@ -354,29 +455,38 @@ fun TaskRow(
                 Spacer(Modifier.width(8.dp))
 
                 Text(
-                    if (showDate) {
+                    text = if (showDate) {
                         "${TaskDates.date(task.dueAtMillis)}, ${task.time}"
                     } else {
                         task.time
                     },
-                    color = TodoColors.Gray,
+                    color = gray,
                     fontSize = 10.sp
                 )
             }
         }
 
+        // Ưu tiên cao
         if (
             task.priority == TaskPriority.HIGH &&
             !task.isCompleted
         ) {
             Text(
-                task.priority.title,
+                text = task.priority.title,
                 fontSize = 10.sp,
-                color = Color(0xFFCF3024),
+                color = if (dark) {
+                    Color(0xFFFFB1A8)
+                } else {
+                    Color(0xFFCF3024)
+                },
                 modifier = Modifier
                     .background(
-                        Color(0xFFFFE5E5),
-                        RoundedCornerShape(4.dp)
+                        color = if (dark) {
+                            Color(0xFF482625)
+                        } else {
+                            Color(0xFFFFE5E5)
+                        },
+                        shape = RoundedCornerShape(4.dp)
                     )
                     .padding(4.dp)
             )
