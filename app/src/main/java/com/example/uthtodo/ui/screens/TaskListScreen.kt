@@ -1,6 +1,8 @@
 
 package com.example.uthtodo.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -25,6 +28,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uthtodo.model.*
 import com.example.uthtodo.ui.components.*
+import kotlinx.coroutines.launch
+
+// Tạo nội dung TXT từ danh sách công việc
+private fun buildTaskExportText(tasks: List<TodoTask>): String {
+    return buildString {
+        appendLine("UTH TO DO - DANH SACH CONG VIEC")
+        appendLine("==============================")
+        appendLine("Tong so cong viec: ${tasks.size}")
+        appendLine(
+            "Chua hoan thanh: ${tasks.count { !it.isCompleted }}"
+        )
+        appendLine(
+            "Da hoan thanh: ${tasks.count { it.isCompleted }}"
+        )
+        appendLine()
+
+        if (tasks.isEmpty()) {
+            appendLine("Khong co cong viec de xuat.")
+        } else {
+            tasks.forEachIndexed { index, task ->
+                appendLine("${index + 1}. ${task.title}")
+                appendLine("Nhom: ${task.category.title}")
+                appendLine(
+                    "Ngay: ${TaskDates.date(task.dueAtMillis)}"
+                )
+                appendLine("Gio: ${task.time}")
+                appendLine("Uu tien: ${task.priority.title}")
+                appendLine(
+                    "Trang thai: " +
+                            if (task.isCompleted) {
+                                "Da hoan thanh"
+                            } else {
+                                "Chua hoan thanh"
+                            }
+                )
+
+                if (task.note.isNotBlank()) {
+                    appendLine("Ghi chu: ${task.note}")
+                }
+
+                appendLine("------------------------------")
+            }
+        }
+    }
+}
 
 @Composable
 fun TaskListScreen(
@@ -39,6 +87,10 @@ fun TaskListScreen(
     onRetry: () -> Unit,
     onOpenTask: (String) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var query by rememberSaveable {
         mutableStateOf("")
     }
@@ -65,9 +117,57 @@ fun TaskListScreen(
     val background = TodoColors.Background
     val ink = TodoColors.Ink
     val gray = TodoColors.Gray
+    val primary = TodoColors.Blue
+
+    // Giữ nội dung chuẩn bị xuất trong lúc
+    // Android mở cửa sổ chọn nơi lưu.
+    var pendingExportText by remember {
+        mutableStateOf("")
+    }
+
+    // Storage Access Framework - CreateDocument
+    val exportTxtLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(
+            "text/plain"
+        )
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val output = context.contentResolver
+                    .openOutputStream(uri)
+                    ?: throw IllegalStateException(
+                        "Không mở được tệp để ghi."
+                    )
+
+                output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write(pendingExportText)
+                }
+
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Đã xuất tệp TXT thành công!"
+                    )
+                }
+            } catch (e: Exception) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Xuất tệp thất bại: " +
+                                (e.localizedMessage ?: "Lỗi không xác định")
+                    )
+                }
+            }
+        }
+
+        pendingExportText = ""
+    }
 
     Scaffold(
         containerColor = background,
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState
+            )
+        },
         bottomBar = {
             DashboardBottomBar(
                 content = dashboard,
@@ -108,6 +208,7 @@ fun TaskListScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // Tìm kiếm
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -120,11 +221,9 @@ fun TaskListScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = ink,
                     unfocusedTextColor = ink,
-                    focusedContainerColor =
-                        TodoColors.Surface,
-                    unfocusedContainerColor =
-                        TodoColors.Surface,
-                    focusedBorderColor = TodoColors.Blue,
+                    focusedContainerColor = TodoColors.Surface,
+                    unfocusedContainerColor = TodoColors.Surface,
+                    focusedBorderColor = primary,
                     unfocusedBorderColor = TodoColors.Line,
                     focusedPlaceholderColor = gray,
                     unfocusedPlaceholderColor = gray
@@ -133,15 +232,13 @@ fun TaskListScreen(
 
             Spacer(Modifier.height(8.dp))
 
+            // Bộ lọc công việc
             Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = category.isEmpty(),
-                    onClick = {
-                        category = ""
-                    },
+                    onClick = { category = "" },
                     label = {
                         Text(content.all)
                     }
@@ -160,19 +257,55 @@ fun TaskListScreen(
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            // CHƯƠNG 12: XUẤT TXT BẰNG SAF
+            OutlinedButton(
+                onClick = {
+                    pendingExportText = buildTaskExportText(visible)
+
+                    exportTxtLauncher.launch("UTH_TODO.txt")
+                },
+                enabled = !feed.isLoading && feed.error == null,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = primary
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = primary
+                )
+            ) {
+                Text(
+                    text = "↓  Xuất danh sách ra tệp TXT",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Text(
+                text = "Xuất các công việc đang hiển thị bằng SAF",
+                fontSize = 11.sp,
+                color = gray,
+                modifier = Modifier.padding(
+                    start = 4.dp,
+                    bottom = 4.dp
+                )
+            )
+
+            // Trạng thái API
             TaskSyncBanner(
                 feed = feed,
                 content = content,
                 onRetry = onRetry
             )
 
+            // Danh sách công việc
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement =
-                    Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(
-                    bottom = 20.dp
-                )
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
             ) {
                 if (
                     visible.isEmpty() &&
@@ -208,9 +341,7 @@ fun TaskListScreen(
                         item {
                             Text(
                                 text = title,
-                                modifier = Modifier.padding(
-                                    top = 12.dp
-                                ),
+                                modifier = Modifier.padding(top = 12.dp),
                                 color = gray,
                                 fontSize = 12.sp
                             )
@@ -281,9 +412,7 @@ fun TaskSyncBanner(
             )
 
             if (feed.error != null) {
-                TextButton(
-                    onClick = onRetry
-                ) {
+                TextButton(onClick = onRetry) {
                     Text(content.retry)
                 }
             }
@@ -320,8 +449,6 @@ fun TaskRow(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        // Đánh dấu hoàn thành
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -375,7 +502,6 @@ fun TaskRow(
             }
         }
 
-        // Thông tin công việc
         Column(
             modifier = if (onOpen != null) {
                 Modifier
@@ -409,8 +535,7 @@ fun TaskRow(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val study =
-                    task.category == TodoCategory.STUDY
+                val study = task.category == TodoCategory.STUDY
 
                 val categoryBackground = if (study) {
                     if (dark) {
@@ -427,7 +552,10 @@ fun TaskRow(
                 }
 
                 val categoryColor = if (study) {
-                    if (dark && primary == Color(0xFF315BEF)) {
+                    if (
+                        dark &&
+                        primary == Color(0xFF315BEF)
+                    ) {
                         Color(0xFF93B1FF)
                     } else {
                         primary
@@ -466,7 +594,6 @@ fun TaskRow(
             }
         }
 
-        // Ưu tiên cao
         if (
             task.priority == TaskPriority.HIGH &&
             !task.isCompleted
