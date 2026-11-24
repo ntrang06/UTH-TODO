@@ -1,3 +1,4 @@
+
 package com.example.uthtodo.ui.screens
 
 import androidx.compose.foundation.background
@@ -27,13 +28,14 @@ fun HomeScreen(
     content: DashboardContent,
     taskContent: TaskContent,
     onProfile: () -> Unit,
+    onNotifications: () -> Unit,
+    onSettings: () -> Unit,
     onList: () -> Unit,
     onAdd: () -> Unit,
     onRetry: () -> Unit,
     onToggleTask: (String) -> Unit,
     apiMode: Boolean = false
 ) {
-
     val tasks = if (apiMode) {
         feed.tasks
     } else {
@@ -42,106 +44,151 @@ fun HomeScreen(
         }
     }
 
-
     val stats = TaskStatistics.from(tasks)
 
+    val background = TodoColors.Background
+    val surface = TodoColors.Surface
+    val ink = TodoColors.Ink
+    val gray = TodoColors.Gray
+    val primary = TodoColors.Blue
+    val dark = TodoColors.isDark
+
     Scaffold(
-        containerColor = DashboardBackground,
+        containerColor = background,
         bottomBar = {
             DashboardBottomBar(
                 content = content,
+                selected = DashboardIcon.HOME,
+                onHome = {},
                 onList = onList,
-                onAdd = onAdd
+                onAdd = onAdd,
+                onNotifications = onNotifications,
+                onSettings = onSettings
             )
         }
     ) { padding ->
+
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+
+            // AVATAR + LỜI CHÀO + CHUÔNG
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
-                    Modifier
+                    modifier = Modifier
                         .clip(CircleShape)
                         .clickable(
                             onClickLabel = content.openProfile,
                             onClick = onProfile
                         )
                 ) {
-                    UserAvatar(user, content.guestInitials)
+                    UserAvatar(
+                        user = user,
+                        fallback = content.guestInitials
+                    )
                 }
 
                 Spacer(Modifier.width(10.dp))
 
-                Column(Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        content.todayDate(),
+                        text = content.todayDate(),
                         fontSize = 12.sp,
-                        color = TodoColors.Gray
+                        color = gray
                     )
 
                     Text(
-                        content.greeting(user),
+                        text = content.greeting(user),
                         fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
+                        color = ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
                 Box(
-                    Modifier
+                    modifier = Modifier
                         .size(42.dp)
-                        .background(Color.White, CircleShape),
+                        .clip(CircleShape)
+                        .background(surface)
+                        .clickable(
+                            onClickLabel = "Mở thông báo",
+                            onClick = onNotifications
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     DashboardSymbol(
-                        DashboardIcon.BELL,
-                        TodoColors.Ink
+                        icon = DashboardIcon.BELL,
+                        color = if (dark) {
+                            TodoColors.Gray
+                        } else {
+                            primary
+                        }
                     )
                 }
             }
 
-            TaskSyncBanner(feed, taskContent, onRetry)
+            TaskSyncBanner(
+                feed = feed,
+                content = taskContent,
+                onRetry = onRetry
+            )
 
             Spacer(Modifier.height(22.dp))
 
+            // THẺ TIẾN ĐỘ
             Row(
-                Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        TodoColors.Blue,
+                        primary,
                         RoundedCornerShape(20.dp)
                     )
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        if (apiMode) "Tiến độ công việc" else content.todayProgress,
+                        text = if (apiMode) {
+                            "Tiến độ công việc"
+                        } else {
+                            content.todayProgress
+                        },
                         color = Color.White,
                         fontSize = 13.sp
                     )
 
+                    Spacer(Modifier.height(3.dp))
+
                     Text(
-                        content.progress(stats),
+                        text = content.progress(stats),
                         color = Color.White,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold
                     )
 
+                    Spacer(Modifier.height(3.dp))
+
                     Text(
-                        content.encouragement,
+                        text = content.encouragement,
                         color = Color.White,
                         fontSize = 12.sp
                     )
                 }
 
                 Box(
-                    Modifier.size(68.dp),
+                    modifier = Modifier.size(68.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
@@ -149,11 +196,13 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         color = Color.White,
                         strokeWidth = 6.dp,
-                        trackColor = Color.White.copy(alpha = 0.3f)
+                        trackColor = Color.White.copy(
+                            alpha = 0.3f
+                        )
                     )
 
                     Text(
-                        "${stats.percent}%",
+                        text = "${stats.percent}%",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
@@ -163,41 +212,48 @@ fun HomeScreen(
 
             Spacer(Modifier.height(18.dp))
 
+            // THẺ HỌC TẬP VÀ CUỘC SỐNG
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement =
+                    Arrangement.spacedBy(12.dp)
             ) {
                 TodoCategory.entries.forEach { category ->
-                    val study = category == TodoCategory.STUDY
+                    val study =
+                        category == TodoCategory.STUDY
 
                     Column(
-                        Modifier
+                        modifier = Modifier
                             .weight(1f)
                             .background(
-                                Color.White,
+                                surface,
                                 RoundedCornerShape(18.dp)
                             )
                             .padding(16.dp)
                     ) {
                         Box(
-                            Modifier
+                            modifier = Modifier
                                 .background(
-                                    if (study) {
+                                    color = if (study) {
                                         TodoColors.Pale
+                                    } else if (dark) {
+                                        Color(0xFF38261B)
                                     } else {
                                         Color(0xFFFFEEDC)
                                     },
-                                    RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(8.dp)
                                 )
                                 .padding(6.dp)
                         ) {
                             DashboardSymbol(
-                                if (study) {
+                                icon = if (study) {
                                     DashboardIcon.STUDY
                                 } else {
                                     DashboardIcon.LIFE
                                 },
-                                if (study) {
-                                    TodoColors.Blue
+                                color = if (study) {
+                                    primary
+                                } else if (dark) {
+                                    Color(0xFFFFAC63)
                                 } else {
                                     Color(0xFFBF6B25)
                                 }
@@ -207,21 +263,22 @@ fun HomeScreen(
                         Spacer(Modifier.height(10.dp))
 
                         Text(
-                            category.title,
+                            text = category.title,
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = ink
                         )
 
                         Spacer(Modifier.height(5.dp))
 
                         Text(
-                            content.remaining(
+                            text = content.remaining(
                                 tasks.count {
                                     it.category == category &&
                                             !it.isCompleted
                                 }
                             ),
-                            color = TodoColors.Gray,
+                            color = gray,
                             fontSize = 12.sp
                         )
                     }
@@ -230,16 +287,30 @@ fun HomeScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // TIÊU ĐỀ DANH SÁCH CÔNG VIỆC
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    if (apiMode) "Công việc từ API" else content.todayTasks,
+                    text = if (apiMode) {
+                        "Việc hôm nay"
+                    } else {
+                        content.todayTasks
+                    },
                     modifier = Modifier.weight(1f),
                     fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = ink
                 )
 
-                TextButton(onClick = onList) {
-                    Text(content.viewAll, fontSize = 12.sp)
+                TextButton(
+                    onClick = onList
+                ) {
+                    Text(
+                        text = content.viewAll,
+                        fontSize = 12.sp,
+                        color = primary
+                    )
                 }
             }
 
@@ -249,14 +320,20 @@ fun HomeScreen(
                 feed.error == null
             ) {
                 Text(
-                    taskContent.emptyToday,
-                    color = TodoColors.Gray,
+                    text = taskContent.emptyToday,
+                    color = gray,
                     fontSize = 13.sp
                 )
             }
 
+            // CÔNG VIỆC HÔM NAY
             tasks.take(4).forEach { task ->
-                TaskRow(task, content, onToggleTask)
+                TaskRow(
+                    task = task,
+                    content = content,
+                    onToggle = onToggleTask
+                )
+
                 Spacer(Modifier.height(8.dp))
             }
         }

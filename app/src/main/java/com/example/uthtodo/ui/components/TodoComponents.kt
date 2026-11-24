@@ -1,3 +1,4 @@
+
 package com.example.uthtodo.ui.components
 
 import androidx.compose.foundation.Canvas
@@ -10,6 +11,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -31,13 +35,61 @@ import androidx.compose.ui.unit.sp
 import com.example.uthtodo.model.*
 
 object TodoColors {
-    val Blue = Color(0xFF2F5BEA)
+    var Blue by mutableStateOf(Color(0xFF315BEF))
+        private set
+
     val White = Color.White
-    val Ink = Color(0xFF1C1C1E)
-    val Gray = Color(0xFF636366)
-    val Pale = Color(0xFFEAEFFD)
-    val Dot = Color(0xFFD1D1D6)
-    val Line = Color(0xFFE4E4EA)
+
+    var Ink by mutableStateOf(Color(0xFF222227))
+        private set
+
+    var Gray by mutableStateOf(Color(0xFF636366))
+        private set
+
+    var Pale by mutableStateOf(Color(0xFFEAEFFD))
+        private set
+
+    var Dot by mutableStateOf(Color(0xFFD1D1D6))
+        private set
+
+    var Line by mutableStateOf(Color(0xFFE4E4EA))
+        private set
+
+    var Background by mutableStateOf(Color(0xFFF5F5F8))
+        private set
+
+    var Surface by mutableStateOf(Color.White)
+        private set
+
+    var isDark by mutableStateOf(false)
+        private set
+
+    fun updateTheme(
+        dark: Boolean,
+        accent: Color
+    ) {
+        isDark = dark
+        Blue = accent
+
+        if (dark) {
+            Background = Color(0xFF101012)
+            Surface = Color(0xFF1F1F22)
+            Ink = Color(0xFFF5F5F8)
+            Gray = Color(0xFFB4B4BC)
+            Pale = Color(0xFF292D3B)
+            Dot = Color(0xFF55555C)
+            Line = Color(0xFF38383E)
+        } else {
+            // Giữ màu sáng ban đầu, không đổi nền
+            Background = Color(0xFFF5F5F8)
+            Surface = Color.White
+            Ink = Color(0xFF222227)
+            Gray = Color(0xFF636366)
+            Pale = Color(0xFFEAEFFD)
+            Dot = Color(0xFFD1D1D6)
+            Line = Color(0xFFE4E4EA)
+        }
+    }
 }
 
 @Composable
@@ -118,6 +170,9 @@ fun TodoLogo(
     description: String,
     inverted: Boolean = false
 ) {
+    val accent = TodoColors.Blue
+    val white = TodoColors.White
+
     Canvas(
         Modifier
             .size(logoSize)
@@ -127,17 +182,8 @@ fun TodoLogo(
     ) {
         val w = size.width
 
-        val ink = if (inverted) {
-            TodoColors.Blue
-        } else {
-            TodoColors.White
-        }
-
-        val paper = if (inverted) {
-            TodoColors.White
-        } else {
-            TodoColors.Blue
-        }
+        val ink = if (inverted) accent else white
+        val paper = if (inverted) white else accent
 
         drawRoundRect(
             color = paper,
@@ -225,7 +271,7 @@ fun TodoIllustration(
                                 .semantics {
                                     contentDescription = task.title
                                 },
-                            color = TodoColors.White,
+                            color = TodoColors.Surface,
                             shape = RoundedCornerShape(16.dp * scale),
                             shadowElevation = 5.dp * scale
                         ) {
@@ -235,14 +281,16 @@ fun TodoIllustration(
                                 ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val blue = TodoColors.Blue
+
                                 Canvas(
                                     Modifier.size(22.dp * scale)
                                 ) {
                                     if (task.isDone) {
-                                        drawCircle(TodoColors.Blue)
+                                        drawCircle(blue)
 
                                         drawLine(
-                                            color = TodoColors.White,
+                                            color = Color.White,
                                             start = Offset(
                                                 size.width * .27f,
                                                 size.height * .50f
@@ -256,7 +304,7 @@ fun TodoIllustration(
                                         )
 
                                         drawLine(
-                                            color = TodoColors.White,
+                                            color = Color.White,
                                             start = Offset(
                                                 size.width * .44f,
                                                 size.height * .66f
@@ -315,7 +363,7 @@ fun TodoIllustration(
                     data.categories.forEachIndexed { index, category ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            color = TodoColors.White,
+                            color = TodoColors.Surface,
                             shape = RoundedCornerShape(16.dp * scale),
                             shadowElevation = 5.dp * scale
                         ) {
@@ -335,7 +383,7 @@ fun TodoIllustration(
                                     modifier = Modifier
                                         .background(
                                             color = if (index == 0) {
-                                                Color(0xFFE6EDFF)
+                                                TodoColors.Pale
                                             } else {
                                                 Color(0xFFFFEBD9)
                                             },
@@ -381,13 +429,15 @@ fun TodoIllustration(
                 ) {
                     Surface(
                         modifier = Modifier.size(84.dp * scale),
-                        color = TodoColors.White,
+                        color = TodoColors.Surface,
                         shape = CircleShape,
                         shadowElevation = 8.dp * scale
                     ) {
                         Box(
                             contentAlignment = Alignment.Center
                         ) {
+                            val blue = TodoColors.Blue
+
                             Canvas(
                                 Modifier
                                     .size(36.dp * scale)
@@ -417,14 +467,14 @@ fun TodoIllustration(
 
                                 drawPath(
                                     path = bell,
-                                    color = TodoColors.Blue,
+                                    color = blue,
                                     style = Stroke(
                                         2.4.dp.toPx() * scale
                                     )
                                 )
 
                                 drawArc(
-                                    color = TodoColors.Blue,
+                                    color = blue,
                                     startAngle = 0f,
                                     sweepAngle = 180f,
                                     useCenter = false,
@@ -450,7 +500,7 @@ fun TodoIllustration(
 
                     Surface(
                         modifier = Modifier.width(180.dp * scale),
-                        color = TodoColors.White,
+                        color = TodoColors.Surface,
                         shape = RoundedCornerShape(14.dp * scale),
                         shadowElevation = 6.dp * scale
                     ) {
