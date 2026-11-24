@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uthtodo.data.AppSettings
 import com.example.uthtodo.data.SettingsRepository
+import com.example.uthtodo.model.AppUser
 import com.example.uthtodo.model.DashboardContent
 import com.example.uthtodo.ui.components.*
 import kotlinx.coroutines.launch
@@ -31,10 +32,13 @@ private val AccentColors = listOf(
     Color(0xFFD34B16),
     Color(0xFF8039F6)
 )
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     dashboard: DashboardContent,
+    user: AppUser?,
+    onProfile: () -> Unit,
     onHome: () -> Unit,
     onList: () -> Unit,
     onAdd: () -> Unit,
@@ -90,7 +94,7 @@ fun SettingsScreen(
         ) {
             Spacer(Modifier.height(22.dp))
 
-            // Tiêu đề
+            // TIÊU ĐỀ VÀ AVATAR TÀI KHOẢN
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -103,20 +107,21 @@ fun SettingsScreen(
                     color = ink
                 )
 
+                // Avatar dùng chung với ProfileScreen
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            TodoColors.Pale,
-                            CircleShape
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            onClickLabel = "Mở hồ sơ cá nhân",
+                            onClick = onProfile
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "UT",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = primary
+                    UserAvatar(
+                        user = user,
+                        fallback = "UT",
+                        size = 44.dp
                     )
                 }
             }
@@ -137,11 +142,10 @@ fun SettingsScreen(
                     .padding(14.dp)
             ) {
 
-                // Sáng / Tối / Tự động
+                // SÁNG / TỐI / TỰ ĐỘNG
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
                         "light" to "Sáng",
@@ -166,7 +170,7 @@ fun SettingsScreen(
                 HorizontalDivider(color = line)
                 Spacer(Modifier.height(16.dp))
 
-                // Màu chủ đạo
+                // MÀU CHỦ ĐẠO
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -195,7 +199,7 @@ fun SettingsScreen(
                 HorizontalDivider(color = line)
                 Spacer(Modifier.height(12.dp))
 
-                // Cỡ chữ
+                // CỠ CHỮ
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -241,9 +245,9 @@ fun SettingsScreen(
                                         CircleShape
                                     )
                                     .border(
-                                        1.dp,
-                                        line,
-                                        CircleShape
+                                        width = 1.dp,
+                                        color = line,
+                                        shape = CircleShape
                                     )
                             )
                         }
@@ -291,7 +295,9 @@ fun SettingsScreen(
                     checked = settings.soundEnabled,
                     onCheckedChange = { enabled ->
                         scope.launch {
-                            repository.setSoundEnabled(enabled)
+                            repository.setSoundEnabled(
+                                enabled
+                            )
                         }
                     }
                 )
@@ -389,32 +395,36 @@ private fun ThemeChoice(
                 .height(75.dp)
                 .clip(shape)
                 .background(
-                    if (darkPreview)
+                    if (darkPreview) {
                         Color(0xFF111113)
-                    else
+                    } else {
                         Color(0xFFF3F3F7)
+                    }
                 )
                 .border(
                     width = if (selected) 2.dp else 1.dp,
-                    color = if (selected)
+                    color = if (selected) {
                         primary
-                    else Color(0xFFE5E5EB),
+                    } else {
+                        Color(0xFFE5E5EB)
+                    },
                     shape = shape
                 )
                 .padding(9.dp)
         ) {
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .width(37.dp)
                         .height(6.dp)
                         .background(
-                            if (darkPreview)
+                            if (darkPreview) {
                                 Color(0xFF66666C)
-                            else Color(0xFFD4D4D9),
+                            } else {
+                                Color(0xFFD4D4D9)
+                            },
                             RoundedCornerShape(4.dp)
                         )
                 )
@@ -425,9 +435,11 @@ private fun ThemeChoice(
                             .fillMaxWidth()
                             .height(18.dp)
                             .background(
-                                if (darkPreview)
+                                if (darkPreview) {
                                     Color(0xFF303033)
-                                else Color.White,
+                                } else {
+                                    Color.White
+                                },
                                 RoundedCornerShape(5.dp)
                             )
                     )
@@ -453,12 +465,16 @@ private fun ThemeChoice(
         Text(
             text = title,
             fontSize = 12.sp,
-            fontWeight = if (selected)
+            fontWeight = if (selected) {
                 FontWeight.SemiBold
-            else FontWeight.Normal,
-            color = if (selected)
+            } else {
+                FontWeight.Normal
+            },
+            color = if (selected) {
                 primary
-            else TodoColors.Gray
+            } else {
+                TodoColors.Gray
+            }
         )
     }
 }
@@ -475,9 +491,11 @@ private fun AccentCircle(
             .size(27.dp)
             .border(
                 width = if (selected) 1.5.dp else 0.dp,
-                color = if (selected)
+                color = if (selected) {
                     color
-                else Color.Transparent,
+                } else {
+                    Color.Transparent
+                },
                 shape = CircleShape
             )
             .padding(3.dp)

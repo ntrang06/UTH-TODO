@@ -961,6 +961,14 @@ fun TodoNavHost(repository: TodoRepository) {
             } else {
                 SettingsScreen(
                     dashboard = dashboardContent,
+                    user = currentUser,
+                    onProfile = {
+                        navController.navigate(
+                            AppDestination.Profile.route
+                        ) {
+                            launchSingleTop = true
+                        }
+                    },
 
                     onHome = {
                         navController.navigate(
