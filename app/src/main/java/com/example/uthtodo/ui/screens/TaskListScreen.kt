@@ -278,21 +278,22 @@ fun TaskListScreen(
                 )
             ) {
                 Text(
-                    text = "↓  Xuất danh sách ra tệp TXT",
+                    text = "Xuất danh sách ra tệp TXT",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
 
-            Text(
-                text = "Xuất các công việc đang hiển thị bằng SAF",
-                fontSize = 11.sp,
-                color = gray,
-                modifier = Modifier.padding(
-                    start = 4.dp,
-                    bottom = 4.dp
-                )
+            Spacer(Modifier.height(8.dp))
+
+            //CHIA SẺ TXT BẰNG FILEPROVIDER
+            ShareTaskFileButton(
+                tasks = visible,
+                enabled = !feed.isLoading && feed.error == null
             )
+
+            Spacer(Modifier.height(8.dp))
+
 
             // Trạng thái API
             TaskSyncBanner(
