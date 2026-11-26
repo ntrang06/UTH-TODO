@@ -63,7 +63,6 @@ class SettingsRepository(context: Context) {
             )
         }
 
-    // Giữ tương thích với ProfileScreen
     val notificationsEnabled: Flow<Boolean> =
         settings.map { it.notificationsEnabled }
 
