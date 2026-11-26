@@ -908,8 +908,6 @@ fun TodoNavHost(repository: TodoRepository) {
                             Date(newTask.dueAtMillis)
                         )
 
-                        // Hàm suspend: AddTaskScreen tự xử lý
-                        // loading, lỗi và khóa nút Lưu.
                         teachingPostApi.createTask(
                             title = newTask.title,
                             note = newTask.note,
@@ -920,9 +918,6 @@ fun TodoNavHost(repository: TodoRepository) {
                             remind = remind
                         )
 
-                        // POST thành công.
-                        // Không dùng ID mẫu trong response Mock.
-                        // UUID trong newTask được giữ làm ID tạm.
                         val localTask = newTask.copy(
                             id = "local:${newTask.id}"
                         )
@@ -952,7 +947,6 @@ fun TodoNavHost(repository: TodoRepository) {
             }
         }
 
-        // Cài đặt - riêng biệt với Hồ sơ
         composable(AppDestination.Settings.route) {
             if (currentUser == null && !isGuest) {
                 LaunchedEffect(Unit) {

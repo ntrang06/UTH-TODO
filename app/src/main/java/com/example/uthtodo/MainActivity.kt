@@ -50,7 +50,6 @@ class MainActivity : ComponentActivity() {
                 SettingsRepository(applicationContext)
             }
 
-            // null khi đang đọc dữ liệu lần đầu
             val loadedSettings by settingsRepository.settings
                 .collectAsState(initial = null)
 
@@ -66,10 +65,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val primary = when (settings.accentColor) {
-                    1 -> Color(0xFF128866)  // Xanh lá
-                    2 -> Color(0xFFD34B16)  // Cam
-                    3 -> Color(0xFF8039F6)  // Tím
-                    else -> Color(0xFF315BEF) // Xanh dương
+                    1 -> Color(0xFF128866)
+                    2 -> Color(0xFFD34B16)
+                    3 -> Color(0xFF8039F6)
+                    else -> Color(0xFF315BEF)
                 }
 
                 val colorScheme = if (darkMode) {
@@ -84,7 +83,7 @@ class MainActivity : ComponentActivity() {
                         onSurfaceVariant = Color(0xFFCACAD0)
                     )
                 } else {
-                    // Giữ nền sáng như thiết kế gốc
+
                     lightColorScheme(
                         primary = primary,
                         onPrimary = Color.White,
@@ -97,7 +96,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Đồng bộ màu dùng chung
                 LaunchedEffect(darkMode, primary) {
                     TodoColors.updateTheme(
                         dark = darkMode,
